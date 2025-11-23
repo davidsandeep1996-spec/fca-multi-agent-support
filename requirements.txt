@@ -1,0 +1,87 @@
+# ============================================================================
+# WEB FRAMEWORK
+# ============================================================================
+
+# FastAPI - Modern async web framework
+fastapi==0.104.1
+
+# Uvicorn - ASGI server to run FastAPI
+uvicorn[standard]==0.24.0
+
+# Python-multipart - Required for file uploads and form data
+python-multipart==0.0.6
+
+# ============================================================================
+# DATABASE
+# ============================================================================
+
+# SQLAlchemy - ORM for database operations
+sqlalchemy[asyncio]==2.0.23
+
+# asyncpg - Async PostgreSQL driver (fast performance)
+asyncpg==0.29.0
+
+# Alembic - Database migration tool
+alembic==1.12.1
+
+# ============================================================================
+# ENVIRONMENT MANAGEMENT
+# ============================================================================
+
+# python-dotenv - Load environment variables from .env file
+python-dotenv==1.0.0
+
+# Pydantic - Data validation and settings management
+pydantic==2.5.0
+
+# Pydantic-settings - Load settings from environment
+pydantic-settings==2.1.0
+
+# ============================================================================
+# AI / LLM
+# ============================================================================
+
+# LangChain - Framework for building with LLMs
+langchain==0.1.0
+
+# LangGraph - Agent workflow orchestration
+langgraph==0.0.20
+
+# LangChain-Groq - Groq AI integration
+langchain-groq==0.0.1
+
+# tiktoken - Token counting for OpenAI models
+tiktoken==0.5.2
+
+# ============================================================================
+# UTILITIES
+# ============================================================================
+
+# httpx - Async HTTP client (for testing and external APIs)
+httpx==0.25.2
+
+# ============================================================================
+# TESTING
+# ============================================================================
+
+# pytest - Test framework
+pytest==7.4.3
+
+# pytest-asyncio - Support for async tests
+pytest-asyncio==0.21.1
+
+# pytest-cov - Code coverage measurement
+pytest-cov==4.1.0
+
+# ============================================================================
+# DEVELOPMENT TOOLS
+# ============================================================================
+
+# black - Code formatter (opinionated, consistent)
+black==23.11.0
+
+# flake8 - Linter for code quality
+flake8==6.1.0
+
+# mypy - Static type checker
+mypy==1.7.1
