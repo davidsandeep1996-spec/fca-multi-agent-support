@@ -1,0 +1,105 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# Top-most EditorConfig file
+root = true
+
+# ============================================================================
+# ALL FILES
+# ============================================================================
+
+[*]
+# Character encoding
+charset = utf-8
+
+# End of line style (LF = Unix style)
+end_of_line = lf
+
+# Ensure file ends with newline
+insert_final_newline = true
+
+# Remove trailing whitespace
+trim_trailing_whitespace = true
+
+# ============================================================================
+# PYTHON FILES
+# ============================================================================
+
+[*.py]
+# Use spaces (not tabs)
+indent_style = space
+
+# 4 spaces per indent (PEP 8 standard)
+indent_size = 4
+
+# Maximum line length
+max_line_length = 100
+
+# ============================================================================
+# YAML FILES
+# ============================================================================
+
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# ============================================================================
+# JSON FILES
+# ============================================================================
+
+[*.json]
+indent_style = space
+indent_size = 2
+
+# ============================================================================
+# MARKDOWN FILES
+# ============================================================================
+
+[*.md]
+# Don't trim trailing whitespace (markdown uses double space for line break)
+trim_trailing_whitespace = false
+max_line_length = off
+
+# ============================================================================
+# TOML FILES
+# ============================================================================
+
+[*.toml]
+indent_style = space
+indent_size = 4
+
+# ============================================================================
+# SHELL SCRIPTS
+# ============================================================================
+
+[*.sh]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+
+# ============================================================================
+# BATCH FILES (Windows)
+# ============================================================================
+
+[*.{bat,cmd}]
+indent_style = space
+indent_size = 2
+end_of_line = crlf  # Windows line endings required
+
+# ============================================================================
+# MAKEFILE
+# ============================================================================
+
+[Makefile]
+indent_style = tab  # Makefiles REQUIRE tabs
+
+# ============================================================================
+# IGNORE PATTERNS
+# ============================================================================
+
+[*.min.js]
+# Minified files - don't format
+insert_final_newline = false
+
+[*.svg]
+# SVG files - don't format
+insert_final_newline = false
