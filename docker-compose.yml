@@ -1,0 +1,114 @@
+version: '3.8'
+
+# ============================================================================
+# SERVICES
+# ============================================================================
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: fca-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fca_user
+      POSTGRES_PASSWORD: fca_password
+      POSTGRES_DB: fca_support
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fca_user -d fca_support"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - fca-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: fca-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fca-network
+
+  # FastAPI Application
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fca-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Application
+      APP_NAME: FCA Multi-Agent Support System
+      APP_VERSION: 0.1.0
+      ENVIRONMENT: development
+      DEBUG: "true"
+      
+      # Database
+      DATABASE_URL: postgresql+asyncpg://fca_user:fca_password@db:5432/fca_support
+      DATABASE_ECHO: "false"
+      
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      REDIS_ENABLED: "true"
+      
+      # Groq AI (from .env file)
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      GROQ_MODEL: mixtral-8x7b-32768
+      GROQ_TEMPERATURE: "0.7"
+      GROQ_MAX_TOKENS: "1024"
+      GROQ_TIMEOUT: "30"
+      
+      # Security
+      SECRET_KEY: ${SECRET_KEY:-secret-key-change-in-production}
+      CORS_ORIGINS: '["http://localhost:3000","http://localhost:8000"]'
+      
+      # Logging
+      LOG_LEVEL: INFO
+      LOG_FILE: logs/app.log
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - fca-network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# ============================================================================
+# VOLUMES
+# ============================================================================
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# ============================================================================
+# NETWORKS
+# ============================================================================
+
+networks:
+  fca-network:
+    driver: bridge
