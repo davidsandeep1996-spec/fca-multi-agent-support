@@ -4,7 +4,7 @@ Pytest Configuration and Fixtures
 This module provides test configuration and reusable fixtures
 for all test modules.
 """
-
+import pytest_asyncio
 import pytest
 import asyncio
 from typing import AsyncGenerator, Generator
@@ -99,31 +99,16 @@ async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
 # APPLICATION FIXTURES
 # ============================================================================
 
-@pytest.fixture
-async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+@pytest_asyncio.fixture
+async def client():
     """
-    Create test client for FastAPI application.
+    Create an async test client for testing FastAPI endpoints.
 
-    Overrides database dependency to use test database.
-
-    Args:
-        db_session: Test database session
-
-    Yields:
-        AsyncClient: HTTP client for testing
+    This fixture provides an AsyncClient that can be used in async tests
+    to make requests to the FastAPI application.
     """
-    # Override database dependency
-    async def override_get_db():
-        yield db_session
-
-    app.dependency_overrides[get_db] = override_get_db
-
-    # Create test client
     async with AsyncClient(app=app, base_url="http://test") as ac:
         yield ac
-
-    # Clear overrides
-    app.dependency_overrides.clear()
 
 
 # ============================================================================
