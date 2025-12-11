@@ -337,9 +337,9 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file.
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/fca-multi-agent-support/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/fca-multi-agent-support/discussions)
-- **Email**: your.email@example.com
+- **Issues**: [GitHub Issues](https://github.com/davidsandeep1996-spec/fca-multi-agent-support/issues)
+
+- **Email**: davidsandeep1996@gmail.com
 
 ---
 
@@ -353,6 +353,48 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file.
 - [ ] Phase 6: WebSocket support
 - [ ] Phase 7: Admin dashboard
 - [ ] Phase 8: Production deployment
+
+
+## Progress
+
+### ✅ Phase 1: Project Setup (Complete)
+- Git repository initialized
+- Directory structure created
+- Configuration files (.gitignore, .env.example, etc.)
+- Docker setup (Dockerfile, docker-compose.yml)
+- CI/CD pipeline (.github/workflows/ci.yml)
+- Development environment (VS Code settings)
+- Documentation (README, CONTRIBUTING, Architecture)
+
+### ✅ Phase 2: Core Application (Complete)
+- FastAPI application structure
+- Configuration management (Pydantic Settings)
+- Structured logging (JSON format)
+- Database connection (SQLAlchemy async)
+- Base models and mixins
+- Health check endpoints
+- Test infrastructure (pytest)
+- Basic test coverage
+
+### 🔄 Phase 3: Database Layer (In Progress)
+- Customer model
+- Conversation model
+- Message model
+- Repository pattern
+- Service layer
+
+### ⏳ Phase 4: Multi-Agent System
+- Agent base classes
+- Intent classifier
+- Product recommender
+- Compliance checker
+- LangGraph workflow
+
+### ⏳ Phase 5: API & Services
+- Conversation endpoints
+- Message endpoints
+- WebSocket support
+- Real-time chat
 
 ---
 
