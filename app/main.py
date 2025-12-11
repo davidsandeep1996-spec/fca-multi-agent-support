@@ -11,16 +11,16 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 import logging
 
-# Import will be created in later commits
-# from app.routers import health
-# from app.config import settings
-# from app.logger import setup_logging
+# Import configuration and utilities
+from app.config import settings
+from app.logger import setup_logging
+from app.database import init_db, close_db
 
-# Temporary imports for Phase 2
-import os
-from dotenv import load_dotenv
-load_dotenv()
+# Import routers
+from app.routers import health
 
+# Setup logging
+setup_logging()
 logger = logging.getLogger(__name__)
 
 # ============================================================================
@@ -36,20 +36,14 @@ def create_application() -> FastAPI:
         FastAPI: Configured application instance
     """
 
-    # Get app configuration
-    app_name = os.getenv("APP_NAME", "FCA Multi-Agent Support System")
-    app_version = os.getenv("APP_VERSION", "0.1.0")
-    environment = os.getenv("ENVIRONMENT", "development")
-    debug = os.getenv("DEBUG", False)
-
     # Create FastAPI instance
     app = FastAPI(
-        title=app_name,
-        version=app_version,
+        title=settings.app_name,
+        version=settings.app_version,
         description="FCA-compliant multi-agent AI support system for UK financial services",
-        docs_url="/docs" if debug else None,  # Disable docs in production
-        redoc_url="/redoc" if debug else None,
-        openapi_url="/openapi.json" if debug else None,
+        docs_url="/docs" if settings.debug else None,  # Disable docs in production
+        redoc_url="/redoc" if settings.debug else None,
+        openapi_url="/openapi.json" if settings.debug else None,
         # Metadata for OpenAPI schema
         contact={
             "name": "David Sandeep",
@@ -66,13 +60,9 @@ def create_application() -> FastAPI:
     # ========================================================================
 
     # CORS Middleware - Allow cross-origin requests
-    cors_origins = os.getenv("CORS_ORIGINS", '["http://localhost:3000"]')
-    # Parse JSON string (simple version for Phase 2)
-    allowed_origins = ["http://localhost:3000", "http://localhost:8000"]
-
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=allowed_origins,
+        allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["*"],  # Allow all HTTP methods
         allow_headers=["*"],  # Allow all headers
@@ -93,12 +83,22 @@ def create_application() -> FastAPI:
         """
         Run on application startup.
 
-        - Initialize logging
-        - Connect to database
-        - Load configuration
+        - Initialize logging (already done)
+        - Initialize database tables (development only)
+        - Log startup information
         """
-        logger.info(f"Starting {app_name} v{app_version}")
-        logger.info(f"Environment: {environment}")
+        logger.info(f"Starting {settings.app_name} v{settings.app_version}")
+        logger.info(f"Environment: {settings.environment}")
+        logger.info(f"Debug mode: {settings.debug}")
+
+        # Initialize database (development only)
+        if settings.is_development:
+            logger.info("Initializing database tables (development mode)")
+            try:
+                await init_db()
+            except Exception as e:
+                logger.error(f"Database initialization failed: {e}", exc_info=True)
+
         logger.info("Application startup complete")
 
     @app.on_event("shutdown")
@@ -111,6 +111,13 @@ def create_application() -> FastAPI:
         - Log shutdown
         """
         logger.info("Shutting down application")
+
+        # Close database connections
+        try:
+            await close_db()
+        except Exception as e:
+            logger.error(f"Error closing database: {e}", exc_info=True)
+
         logger.info("Application shutdown complete")
 
     # ========================================================================
@@ -135,7 +142,7 @@ def create_application() -> FastAPI:
             status_code=500,
             content={
                 "error": "Internal Server Error",
-                "message": str(exc) if debug else "An unexpected error occurred",
+                "message": str(exc) if settings.debug else "An unexpected error occurred",
             },
         )
 
@@ -143,7 +150,7 @@ def create_application() -> FastAPI:
     # ROUTERS
     # ========================================================================
 
-    # Root endpoint (temporary)
+    # Root endpoint
     @app.get("/", tags=["Root"])
     async def root():
         """
@@ -153,14 +160,19 @@ def create_application() -> FastAPI:
             dict: API metadata
         """
         return {
-            "name": app_name,
-            "version": app_version,
+            "name": settings.app_name,
+            "version": settings.app_version,
             "status": "operational",
-            "docs": "/docs" if debug else "disabled"
+            "environment": settings.environment,
+            "docs": "/docs" if settings.debug else "disabled",
         }
 
-    # Health check router will be added in Commit 21
-    # app.include_router(health.router, prefix="/api/v1", tags=["Health"])
+    # Register routers
+    app.include_router(
+        health.router,
+        prefix="/api/v1",
+        tags=["Health"],
+    )
 
     return app
 
@@ -171,14 +183,6 @@ def create_application() -> FastAPI:
 
 # Create application instance
 app = create_application()
-
-from app.routers import health
-
-app.include_router(
-    health.router,
-    prefix="/api/v1",
-    tags=["Health"],
-)
 
 
 # ============================================================================
