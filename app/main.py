@@ -4,7 +4,7 @@ FastAPI Application Entry Point
 This module initializes the FastAPI application, configures middleware,
 registers routers, and sets up CORS policies.
 """
-
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -22,6 +22,52 @@ from app.routers import health
 # Setup logging
 setup_logging()
 logger = logging.getLogger(__name__)
+
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Manage application lifespan (startup and shutdown).
+
+    Startup:
+    - Initialize logging
+    - Initialize database tables (development only)
+    - Log startup information
+
+    Shutdown:
+    - Close database connections
+    - Cleanup resources
+    - Log shutdown
+    """
+    # ========== STARTUP ==========
+    logger.info(f"Starting {settings.app_name} v{settings.app_version}")
+    logger.info(f"Environment: {settings.environment}")
+    logger.info(f"Debug mode: {settings.debug}")
+
+    # Initialize database (development only)
+    if settings.is_development:
+        logger.info("Initializing database tables (development mode)")
+        try:
+            await init_db()
+        except Exception as e:
+            logger.error(f"Database initialization failed: {e}", exc_info=True)
+
+    logger.info("Application startup complete")
+
+    yield  # Application runs here
+
+    # ========== SHUTDOWN ==========
+    logger.info("Shutting down application")
+
+    # Close database connections
+    try:
+        await close_db()
+    except Exception as e:
+        logger.error(f"Error closing database: {e}", exc_info=True)
+
+    logger.info("Application shutdown complete")
+
 
 # ============================================================================
 # APPLICATION FACTORY
@@ -44,6 +90,7 @@ def create_application() -> FastAPI:
         docs_url="/docs" if settings.debug else None,  # Disable docs in production
         redoc_url="/redoc" if settings.debug else None,
         openapi_url="/openapi.json" if settings.debug else None,
+        lifespan=lifespan,
         # Metadata for OpenAPI schema
         contact={
             "name": "David Sandeep",
@@ -74,51 +121,8 @@ def create_application() -> FastAPI:
         minimum_size=1000,  # Only compress responses > 1KB
     )
 
-    # ========================================================================
-    # EVENT HANDLERS
-    # ========================================================================
 
-    @app.on_event("startup")
-    async def startup_event():
-        """
-        Run on application startup.
 
-        - Initialize logging (already done)
-        - Initialize database tables (development only)
-        - Log startup information
-        """
-        logger.info(f"Starting {settings.app_name} v{settings.app_version}")
-        logger.info(f"Environment: {settings.environment}")
-        logger.info(f"Debug mode: {settings.debug}")
-
-        # Initialize database (development only)
-        if settings.is_development:
-            logger.info("Initializing database tables (development mode)")
-            try:
-                await init_db()
-            except Exception as e:
-                logger.error(f"Database initialization failed: {e}", exc_info=True)
-
-        logger.info("Application startup complete")
-
-    @app.on_event("shutdown")
-    async def shutdown_event():
-        """
-        Run on application shutdown.
-
-        - Close database connections
-        - Cleanup resources
-        - Log shutdown
-        """
-        logger.info("Shutting down application")
-
-        # Close database connections
-        try:
-            await close_db()
-        except Exception as e:
-            logger.error(f"Error closing database: {e}", exc_info=True)
-
-        logger.info("Application shutdown complete")
 
     # ========================================================================
     # EXCEPTION HANDLERS
