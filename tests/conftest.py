@@ -100,7 +100,7 @@ async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
 # ============================================================================
 
 @pytest_asyncio.fixture
-async def client():
+async def client ():
     """
     Create an async test client for testing FastAPI endpoints.
 
