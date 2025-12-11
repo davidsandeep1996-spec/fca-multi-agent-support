@@ -172,6 +172,14 @@ def create_application() -> FastAPI:
 # Create application instance
 app = create_application()
 
+from app.routers import health
+
+app.include_router(
+    health.router,
+    prefix="/api/v1",
+    tags=["Health"],
+)
+
 
 # ============================================================================
 # MAIN ENTRY POINT (for direct execution)
@@ -188,5 +196,3 @@ if __name__ == "__main__":
         reload=True,  # Auto-reload on code changes
         log_level="info",
     )
-
-
