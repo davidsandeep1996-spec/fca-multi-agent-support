@@ -5,13 +5,11 @@ This module provides base model classes and common utilities
 for all database models in the application.
 """
 
-from datetime import datetime
+from datetime import datetime,timezone
 from sqlalchemy import Column, Integer, DateTime, Boolean
 from typing import Any
 
 from app.database import Base
-
-__all__ = ["Base", "TimestampMixin", "BaseModel"]
 
 
 # ============================================================================
@@ -27,15 +25,15 @@ class TimestampMixin:
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow,
+        default=datetime.now(timezone.utc),
         nullable=False,
         comment="Record creation timestamp (UTC)",
     )
 
     updated_at = Column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=datetime.now(timezone.utc),
+        onupdate=datetime.now(timezone.utc),
         nullable=False,
         comment="Record last update timestamp (UTC)",
     )
@@ -70,7 +68,7 @@ class SoftDeleteMixin:
     def soft_delete(self) -> None:
         """Mark record as deleted without removing from database."""
         self.is_deleted = True
-        self.deleted_at = datetime.utcnow()
+        self.deleted_at = datetime.now(datetime.timezone.utc)
 
     def restore(self) -> None:
         """Restore a soft-deleted record."""
@@ -168,3 +166,21 @@ class BaseModel(Base, TimestampMixin):
 # - __repr__() method
 # - to_dict() method
 # - from_dict() class method
+
+
+from app.models.customer import Customer
+from app.models.conversation import Conversation, ConversationStatus, ConversationChannel
+from app.models.message import Message, MessageRole
+
+__all__ = [
+    "Base",
+    "Customer",
+    "Conversation",
+    "ConversationStatus",
+    "ConversationChannel",
+    "Message",
+    "MessageRole",
+    "TimestampMixin",
+    "SoftDeleteMixin",
+    "BaseModel",
+]
