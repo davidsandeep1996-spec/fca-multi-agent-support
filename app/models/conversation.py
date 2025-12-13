@@ -135,7 +135,7 @@ class Conversation(BaseModel):
 
     customer = relationship(
         "Customer",
-        back_populates="conversation",
+        back_populates="conversations",
         lazy="selectin",  # Eager load customer
     )
 
