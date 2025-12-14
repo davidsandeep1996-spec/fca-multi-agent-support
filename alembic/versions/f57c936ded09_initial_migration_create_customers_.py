@@ -1,7 +1,7 @@
 """Initial migration: create customers, conversations, messages tables
 
 Revision ID: f57c936ded09
-Revises: 
+Revises:
 Create Date: 2025-12-14 18:31:52.625606
 
 """
@@ -120,3 +120,7 @@ def downgrade() -> None:
     op.drop_index('idx_active_vip', table_name='customers')
     op.drop_table('customers')
     # ### end Alembic commands ###
+    # Drop ENUM types (PostgreSQL only)
+    op.execute("DROP TYPE IF EXISTS conversationstatus CASCADE;")
+    op.execute("DROP TYPE IF EXISTS conversationchannel CASCADE;")
+    op.execute("DROP TYPE IF EXISTS messagerole CASCADE;")
