@@ -32,8 +32,8 @@ def upgrade() -> None:
     sa.Column('is_vip', sa.Boolean(), nullable=False, comment='VIP customer flag (premium service)'),
     sa.Column('notes', sa.Text(), nullable=True, comment='Internal notes about customer'),
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False, comment='Primary key'),
-    sa.Column('created_at', sa.DateTime(), nullable=False, comment='Record creation timestamp (UTC)'),
-    sa.Column('updated_at', sa.DateTime(), nullable=False, comment='Record last update timestamp (UTC)'),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False, comment='Record creation timestamp (UTC)'),
+    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False, comment='Record last update timestamp (UTC)'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index('idx_active_vip', 'customers', ['is_active', 'is_vip'], unique=False)
@@ -53,8 +53,8 @@ def upgrade() -> None:
     sa.Column('message_count', sa.Integer(), nullable=False, comment='Total number of messages'),
     sa.Column('escalation_reason', sa.Text(), nullable=True, comment='Reason for escalation (if escalated)'),
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False, comment='Primary key'),
-    sa.Column('created_at', sa.DateTime(), nullable=False, comment='Record creation timestamp (UTC)'),
-    sa.Column('updated_at', sa.DateTime(), nullable=False, comment='Record last update timestamp (UTC)'),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False, comment='Record creation timestamp (UTC)'),
+    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False, comment='Record last update timestamp (UTC)'),
     sa.ForeignKeyConstraint(['customer_id'], ['customers.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
@@ -77,8 +77,8 @@ def upgrade() -> None:
     sa.Column('requires_human', sa.Boolean(), nullable=False, comment='Whether message requires human agent intervention'),
     sa.Column('metadata_json', sa.Text(), nullable=True, comment='Additional metadata as JSON string'),
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False, comment='Primary key'),
-    sa.Column('created_at', sa.DateTime(), nullable=False, comment='Record creation timestamp (UTC)'),
-    sa.Column('updated_at', sa.DateTime(), nullable=False, comment='Record last update timestamp (UTC)'),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False, comment='Record creation timestamp (UTC)'),
+    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False, comment='Record last update timestamp (UTC)'),
     sa.ForeignKeyConstraint(['conversation_id'], ['conversations.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )

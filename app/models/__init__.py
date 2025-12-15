@@ -24,14 +24,14 @@ class TimestampMixin:
     """
 
     created_at = Column(
-        DateTime,
+        DateTime(timezone=True),
         default=datetime.now(timezone.utc),
         nullable=False,
         comment="Record creation timestamp (UTC)",
     )
 
     updated_at = Column(
-        DateTime,
+        DateTime(timezone=True),
         default=datetime.now(timezone.utc),
         onupdate=datetime.now(timezone.utc),
         nullable=False,
@@ -51,7 +51,7 @@ class SoftDeleteMixin:
     """
 
     deleted_at = Column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=True,
         default=None,
         comment="Record deletion timestamp (NULL if not deleted)",
