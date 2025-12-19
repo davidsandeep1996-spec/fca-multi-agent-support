@@ -16,11 +16,11 @@ services:
       POSTGRES_DB: fca_support
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8"
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U fca_user -d fca_support"]
+      test: [ "CMD-SHELL", "pg_isready -U fca_user -d fca_support" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -39,7 +39,7 @@ services:
       - redis_data:/data
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -61,26 +61,26 @@ services:
       APP_VERSION: 0.1.0
       ENVIRONMENT: development
       DEBUG: "true"
-      
+
       # Database
       DATABASE_URL: postgresql+asyncpg://fca_user:fca_password@db:5432/fca_support
       DATABASE_ECHO: "false"
-      
+
       # Redis
       REDIS_URL: redis://redis:6379/0
       REDIS_ENABLED: "true"
-      
+
       # Groq AI (from .env file)
       GROQ_API_KEY: ${GROQ_API_KEY}
       GROQ_MODEL: mixtral-8x7b-32768
       GROQ_TEMPERATURE: "0.7"
       GROQ_MAX_TOKENS: "1024"
       GROQ_TIMEOUT: "30"
-      
+
       # Security
       SECRET_KEY: ${SECRET_KEY:-secret-key-change-in-production}
       CORS_ORIGINS: '["http://localhost:3000","http://localhost:8000"]'
-      
+
       # Logging
       LOG_LEVEL: INFO
       LOG_FILE: logs/app.log
