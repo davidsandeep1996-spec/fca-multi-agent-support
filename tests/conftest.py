@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from httpx import AsyncClient
 
 from app.main import app
-from app.database import Base, get_db
+from app.database import Base
 from app.config import settings
 
 # ============================================================================
@@ -24,31 +24,25 @@ from app.config import settings
 def event_loop() -> Generator:
     """
     Create an instance of the default event loop for the test session.
-
-    Yields:
-        AbstractEventLoop: Event loop
     """
-    loop = asyncio.get_event_loop_policy().new_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     yield loop
     loop.close()
-
 
 # ============================================================================
 # DATABASE FIXTURES
 # ============================================================================
 
-@pytest.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session")
 async def test_engine():
     """
     Create test database engine.
-
     Uses separate test database to avoid affecting development data.
-
-    Yields:
-        Engine: SQLAlchemy async engine
     """
-    # Use test database URL
-    test_db_url = settings.database_url.replace("/fca_support", "/fca_support_test")
+    # Use test database URL (ensure this replaces the DB name correctly)
+    # This replaces 'fca_support' with 'fca_support_test' in the connection string
+    test_db_url = settings.database_url.replace("fca_support", "fca_support_test")
 
     # Create test engine
     engine = create_async_engine(
@@ -59,6 +53,7 @@ async def test_engine():
 
     # Create tables
     async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all) # Start clean
         await conn.run_sync(Base.metadata.create_all)
 
     yield engine
@@ -70,15 +65,10 @@ async def test_engine():
     await engine.dispose()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
     """
     Create database session for testing.
-
-    Each test gets a fresh session with transaction rollback after test.
-
-    Args:
-        test_engine: Test database engine
 
     Yields:
         AsyncSession: Database session
@@ -92,7 +82,15 @@ async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
 
     async with async_session() as session:
         yield session
-        await session.rollback()  # Rollback after test
+        await session.rollback()
+
+    # CRITICAL FIX: Clean up data after each test
+    # Because service methods call .commit(), data persists even after session.rollback()
+    # We must explicitly delete data to prevent "already exists" errors in subsequent tests
+    async with test_engine.begin() as conn:
+        # Delete data from all tables in reverse order of dependency
+        for table in reversed(Base.metadata.sorted_tables):
+            await conn.execute(table.delete())
 
 
 # ============================================================================
@@ -100,16 +98,12 @@ async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
 # ============================================================================
 
 @pytest_asyncio.fixture
-async def client ():
+async def client():
     """
     Create an async test client for testing FastAPI endpoints.
-
-    This fixture provides an AsyncClient that can be used in async tests
-    to make requests to the FastAPI application.
     """
     async with AsyncClient(app=app, base_url="http://test") as ac:
         yield ac
-
 
 # ============================================================================
 # UTILITY FIXTURES
@@ -119,8 +113,5 @@ async def client ():
 def anyio_backend():
     """
     Specify async backend for anyio.
-
-    Returns:
-        str: Backend name
     """
     return "asyncio"
