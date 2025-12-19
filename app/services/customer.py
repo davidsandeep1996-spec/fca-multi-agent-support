@@ -22,7 +22,11 @@ class CustomerService(BaseService):
     def __init__(self, db: AsyncSession = None):
         """Initialize customer service."""
         super().__init__(db)
-        self.repo = None
+        # Initialize repo immediately if DB session exists
+        if self.db:
+            self.repo = CustomerRepository(self.db)
+        else:
+            self.repo = None
 
     async def __aenter__(self):
         """Enter async context."""
