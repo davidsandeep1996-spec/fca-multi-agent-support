@@ -22,7 +22,7 @@ class AgentConfig:
 
     def __init__(
         self,
-        model_name: str = "mixtral-8x7b-32768",
+        model_name: str = "llama-3.1-8b-instant",
         temperature: float = 0.7,
         max_tokens: int = 1024,
         timeout: int = 30,

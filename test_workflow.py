@@ -21,11 +21,11 @@ async def test_workflow():
     # Test scenarios
     test_cases = [
         {
-            "message": "What's my account balance?",
+            "message": "i want a credit card?",
             "expected_agent": "account",
         },
         {
-            "message": "How do I open an account?",
+            "message": "i want a mortgage?",
             "expected_agent": "general",
         },
         {

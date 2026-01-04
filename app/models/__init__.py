@@ -171,6 +171,9 @@ class BaseModel(Base, TimestampMixin):
 from app.models.customer import Customer
 from app.models.conversation import Conversation, ConversationStatus, ConversationChannel
 from app.models.message import Message, MessageRole
+from app.models.product import Product
+from app.models.account import Account, AccountType, AccountStatus
+from app.models.transaction import Transaction
 
 __all__ = [
     "Base",
@@ -183,4 +186,9 @@ __all__ = [
     "TimestampMixin",
     "SoftDeleteMixin",
     "BaseModel",
+    "Product",
+    "Account",
+    "AccountType",
+    "AccountStatus",
+    "Transaction"
 ]

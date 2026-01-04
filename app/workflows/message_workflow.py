@@ -124,7 +124,7 @@ class MessageWorkflow:
 
         # Extract intent
         intent = classification.metadata.get("intent", "general_inquiry")
-        confidence = classification.metadata.get("confidence", 0.0)
+        confidence = classification.confidence
 
         # Update state
         state["intent"] = intent
@@ -208,11 +208,11 @@ class MessageWorkflow:
         # Run compliance checker
         response = await self.compliance_agent.process({
             "content": agent_response,
-            "product_type": state.get("agent_metadata", {}).get("product_type"),
+            "product_type": state.get("agent_metadata", {}).get("products"),
         })
 
         state["compliance_check"] = response.content
-        state["is_compliant"] = response.metadata.get("is_compliant", True)
+        state["is_compliant"] = response.metadata.get("is_compliant")
         state["required_disclaimers"] = response.metadata.get("required_disclaimers", [])
 
         # Append disclaimers to agent response if not compliant
@@ -281,7 +281,8 @@ class MessageWorkflow:
         intent_map = {
             "account_inquiry": "account",
             "general_inquiry": "general",
-            "product_inquiry": "product",
+            "loan_inquiry": "product",
+            "credit_card": "product",
             "complaint": "complaint",
         }
 

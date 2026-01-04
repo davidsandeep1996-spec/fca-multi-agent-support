@@ -378,6 +378,7 @@ Be thorough and strict - compliance violations can result in significant penalti
                 suggestions = line.split(":", 1)[1].strip()
 
         return {
+            "compliant": compliant,
             "issues": issues,
             "warnings": warnings,
             "suggestions": suggestions,

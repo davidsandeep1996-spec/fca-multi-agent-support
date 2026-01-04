@@ -39,14 +39,15 @@ class GeneralAgent(BaseAgent):
         "contact_support": {
             "question": "How do I contact support?",
             "answer": (
-                "You can reach our support team:\n"
-                "📞 Phone: 0800-123-4567 (24/7)\n"
-                "📧 Email: support@bank.com\n"
-                "💬 Chat: Available in app\n"
-                "📍 Visit: Local branch\n\n"
-                "Average response time: 2 hours"
+                "You can contact our support team at:\n"
+                "📞 Phone: +44-20-XXXX-XXXX\n"
+                "📧 Email: support@fca-bank.com\n"
+                "💬 Live Chat: Available 9am-6pm weekdays\n"
+                "🕐 Hours: Monday-Friday, 9am-6pm GMT\n\n"
+                "Our team typically responds within 24 hours."
             ),
         },
+
         "fees": {
             "question": "What are your account fees?",
             "answer": (

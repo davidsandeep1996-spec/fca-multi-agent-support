@@ -1,89 +1,118 @@
-# ============================================================================
-# WEB FRAMEWORK
-# ============================================================================
-
-# FastAPI - Modern async web framework
-fastapi==0.104.1
-
-# Uvicorn - ASGI server to run FastAPI
-uvicorn[standard]==0.24.0
-
-# Python-multipart - Required for file uploads and form data
-python-multipart==0.0.6
-
-# ============================================================================
-# DATABASE
-# ============================================================================
-
-# SQLAlchemy - ORM for database operations
-sqlalchemy[asyncio]==2.0.23
-
-# asyncpg - Async PostgreSQL driver (fast performance)
-asyncpg==0.29.0
-
-# Alembic - Database migration tool
+aiohappyeyeballs==2.6.1
+aiohttp==3.13.2
+aiosignal==1.4.0
 alembic==1.12.1
-
-# ============================================================================
-# ENVIRONMENT MANAGEMENT
-# ============================================================================
-
-# python-dotenv - Load environment variables from .env file
-python-dotenv==1.0.0
-
-# Pydantic - Data validation and settings management
-pydantic==2.5.0
-
-# Pydantic-settings - Load settings from environment
-pydantic-settings==2.1.0
-
-# ============================================================================
-# AI / LLM
-# ============================================================================
-
-# LangChain - Framework for building with LLMs
-langchain==0.1.0
-
-# LangGraph - Agent workflow orchestration
-langgraph==0.0.20
-
-# LangChain-Groq - Groq AI integration
-langchain-groq==0.0.1
-
-# tiktoken - Token counting for OpenAI models
-tiktoken==0.5.2
-
-# ============================================================================
-# UTILITIES
-# ============================================================================
-
-# httpx - Async HTTP client (for testing and external APIs)
-httpx==0.25.2
-
-# ============================================================================
-# TESTING
-# ============================================================================
-
-# pytest - Test framework
-pytest==7.4.3
-
-# pytest-asyncio - Support for async tests
-pytest-asyncio==0.21.1
-
-# pytest-cov - Code coverage measurement
-pytest-cov==4.1.0
-
-# ============================================================================
-# DEVELOPMENT TOOLS
-# ============================================================================
-
-# black - Code formatter (opinionated, consistent)
+annotated-types==0.7.0
+anyio==3.7.1
+appnope @ file:///home/conda/feedstock_root/build_artifacts/appnope_1733332318622/work
+asttokens @ file:///home/conda/feedstock_root/build_artifacts/asttokens_1763409923949/work
+asyncpg==0.29.0
+attrs==25.4.0
 black==23.11.0
-
-# flake8 - Linter for code quality
+certifi==2025.11.12
+charset-normalizer==3.4.4
+click==8.3.1
+comm @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_comm_1753453984/work
+coverage==7.12.0
+dataclasses-json==0.6.7
+debugpy @ file:///private/var/folders/sy/f16zz6x50xz3113nwtb9bvq00000gp/T/abs_a5sm9dmihj/croot/debugpy_1736267550163/work
+decorator @ file:///home/conda/feedstock_root/build_artifacts/decorator_1740384970518/work
+distro==1.9.0
+executing @ file:///home/conda/feedstock_root/build_artifacts/executing_1756729339227/work
+fastapi==0.104.1
 flake8==6.1.0
-
-# mypy - Static type checker
+frozenlist==1.8.0
+greenlet==3.2.4
+groq==0.37.1
+h11==0.16.0
+httpcore==1.0.9
+httptools==0.7.1
+httpx==0.25.2
+httpx-sse==0.4.3
+idna==3.11
+iniconfig==2.3.0
+ipykernel @ file:///Users/runner/miniforge3/conda-bld/bld/rattler-build_ipykernel_1761567969/work
+ipython @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_ipython_1764766793/work
+ipython_pygments_lexers @ file:///home/conda/feedstock_root/build_artifacts/ipython_pygments_lexers_1737123620466/work
+jedi @ file:///home/conda/feedstock_root/build_artifacts/jedi_1733300866624/work
+jsonpatch==1.33
+jsonpointer==3.0.0
+jupyter_client @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_jupyter_client_1765375773/work
+jupyter_core @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_jupyter_core_1760643864/work
+langchain==1.2.0
+langchain-classic==1.0.0
+langchain-community==0.4.1
+langchain-core==1.2.4
+langchain-groq==1.1.1
+langchain-text-splitters==1.1.0
+langgraph==1.0.5
+langgraph-checkpoint==3.0.1
+langgraph-prebuilt==1.0.5
+langgraph-sdk==0.3.1
+langsmith==0.5.0
+Mako==1.3.10
+MarkupSafe==3.0.3
+marshmallow==3.26.1
+matplotlib-inline @ file:///home/conda/feedstock_root/build_artifacts/matplotlib-inline_1761214490209/work
+mccabe==0.7.0
+msgpack==1.1.2
+multidict==6.7.0
 mypy==1.7.1
-
-alembic==1.13.0
+mypy_extensions==1.1.0
+nest_asyncio @ file:///home/conda/feedstock_root/build_artifacts/nest-asyncio_1733325553580/work
+numpy==1.26.4
+orjson==3.11.5
+ormsgpack==1.12.1
+packaging==23.2
+parso @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_parso_1755974222/work
+pathspec==0.12.1
+pexpect @ file:///home/conda/feedstock_root/build_artifacts/pexpect_1733301927746/work
+platformdirs==4.5.0
+pluggy==1.6.0
+prompt_toolkit @ file:///home/conda/feedstock_root/build_artifacts/prompt-toolkit_1756321756983/work
+propcache==0.4.1
+psutil @ file:///private/var/folders/sy/f16zz6x50xz3113nwtb9bvq00000gp/T/abs_ed123tcwwq/croot/psutil_1736369384437/work
+psycopg2-binary==2.9.11
+ptyprocess @ file:///home/conda/feedstock_root/build_artifacts/ptyprocess_1733302279685/work/dist/ptyprocess-0.7.0-py2.py3-none-any.whl#sha256=92c32ff62b5fd8cf325bec5ab90d7be3d2a8ca8c8a3813ff487a8d2002630d1f
+pure_eval @ file:///home/conda/feedstock_root/build_artifacts/pure_eval_1733569405015/work
+pycodestyle==2.11.1
+pydantic==2.12.5
+pydantic-settings==2.12.0
+pydantic_core==2.41.5
+pyflakes==3.1.0
+Pygments @ file:///home/conda/feedstock_root/build_artifacts/pygments_1750615794071/work
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+python-dateutil @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_python-dateutil_1751104122/work
+python-dotenv==1.0.0
+python-multipart==0.0.6
+PyYAML==6.0.3
+pyzmq @ file:///private/var/folders/sy/f16zz6x50xz3113nwtb9bvq00000gp/T/abs_728n2oj6m9/croot/pyzmq_1734709561835/work
+regex==2025.11.3
+requests==2.32.5
+requests-toolbelt==1.0.0
+setuptools==78.1.1
+six @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_six_1753199211/work
+sniffio==1.3.1
+SQLAlchemy==2.0.23
+stack_data @ file:///home/conda/feedstock_root/build_artifacts/stack_data_1733569443808/work
+starlette==0.27.0
+tenacity==8.5.0
+tiktoken==0.5.2
+tornado @ file:///private/var/folders/c_/qfmhj66j0tn016nkx_th4hxm0000gp/T/abs_53i9d3wys5/croot/tornado_1748956943199/work
+traitlets @ file:///home/conda/feedstock_root/build_artifacts/traitlets_1733367359838/work
+typing-inspect==0.9.0
+typing-inspection==0.4.2
+typing_extensions @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_typing_extensions_1756220668/work
+urllib3==2.5.0
+uuid_utils==0.12.0
+uvicorn==0.24.0
+uvloop==0.22.1
+watchfiles==1.1.1
+wcwidth @ file:///home/conda/feedstock_root/build_artifacts/wcwidth_1758622279606/work
+websockets==15.0.1
+wheel==0.45.1
+xxhash==3.6.0
+yarl==1.22.0
+zstandard==0.25.0

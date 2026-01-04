@@ -15,6 +15,7 @@ import logging
 from app.config import settings
 from app.logger import setup_logging
 from app.database import init_db, close_db
+from app.api.routes.messages import router as messages_router
 
 # Import routers
 from app.routers import health
@@ -177,6 +178,9 @@ def create_application() -> FastAPI:
         prefix="/api/v1",
         tags=["Health"],
     )
+
+    app.include_router(messages_router)
+
 
     return app
 
