@@ -16,6 +16,8 @@ from app.config import settings
 from app.logger import setup_logging
 from app.database import init_db, close_db
 from app.api.routes.messages import router as messages_router
+from app.routers.admin import router as admin_router
+
 
 # Import routers
 from app.routers import health
@@ -180,6 +182,7 @@ def create_application() -> FastAPI:
     )
 
     app.include_router(messages_router)
+    app.include_router(admin_router)
 
 
     return app
