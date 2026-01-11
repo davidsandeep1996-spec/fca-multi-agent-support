@@ -15,7 +15,7 @@ class AccountService(BaseService):
         self.repo = AccountRepository(self.db)
         return self
 
-    async def get_customer_accounts(self, customer_id: str) -> List[Account]:
+    async def get_accounts_by_customer(self, customer_id: str) -> List[Account]:
         """Get all accounts for a customer ID."""
         return await self.repo.get_by_customer_id(customer_id)
 
@@ -23,4 +23,3 @@ class AccountService(BaseService):
         """Get balance for a specific account."""
         account = await self.repo.get_by_account_number(account_number)
         return float(account.balance) if account else None
-

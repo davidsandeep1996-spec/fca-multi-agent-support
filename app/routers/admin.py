@@ -55,7 +55,7 @@ async def seed_database(request: SeedRequest, background_tasks: BackgroundTasks)
     """
     try:
         # Import here to avoid circular imports
-        from app.scripts.seed_database import seed_all
+        from app.seed_database import seed_all
 
         # Validate customer count
         customer_count = request.customer_count

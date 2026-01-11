@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional, List
 from groq import AsyncGroq
 
 from app.agents.base import BaseAgent, AgentConfig, AgentResponse
-
+from app.services import ProductService
 
 class GeneralAgent(BaseAgent):
     """
@@ -100,10 +100,12 @@ class GeneralAgent(BaseAgent):
         },
     }
 
-    def __init__(self, config: Optional[AgentConfig] = None):
+    def __init__(self, config: Optional[AgentConfig] = None,    product_service: ProductService = None,
+    **kwargs):
         """Initialize general agent."""
         super().__init__(name="general_agent", config=config)
         self.client = AsyncGroq(api_key=self.config.api_key)
+        self.product_service = product_service or ProductService()
 
     # ========================================================================
     # ABSTRACT METHOD IMPLEMENTATIONS

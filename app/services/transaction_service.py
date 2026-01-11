@@ -15,6 +15,6 @@ class TransactionService(BaseService):
         self.repo = TransactionRepository(self.db)
         return self
 
-    async def get_recent_transactions(self, account_id: int, limit: int = 10) -> List[Transaction]:
+    async def get_transactions_by_account(self, account_id: int, limit: int = 10) -> List[Transaction]:
         """Get recent transactions for an account."""
         return await self.repo.get_by_account_id(account_id, limit)

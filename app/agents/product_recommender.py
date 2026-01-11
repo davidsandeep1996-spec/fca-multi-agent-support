@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional, List
 from groq import AsyncGroq
 
 from app.agents.base import BaseAgent, AgentConfig, AgentResponse
-
+from app.services import ProductService
 
 class ProductRecommenderAgent(BaseAgent):
     """
@@ -89,12 +89,17 @@ class ProductRecommenderAgent(BaseAgent):
         },
     }
 
-    def __init__(self, config: Optional[AgentConfig] = None):
+    def __init__(self, config: Optional[AgentConfig] = None,    product_service: ProductService = None,
+    **kwargs):
         """Initialize product recommender agent."""
         super().__init__(name="product_recommender", config=config)
 
         # Initialize Groq client
         self.client = AsyncGroq(api_key=self.config.api_key)
+        self.productservice = product_service
+        if self.productservice is None:
+            raise ValueError("ProductRecommenderAgent requires ProductService injected with a DB session")
+
 
     # ========================================================================
     # ABSTRACT METHOD IMPLEMENTATIONS

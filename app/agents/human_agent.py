@@ -10,7 +10,7 @@ from datetime import datetime
 from enum import Enum
 
 from app.agents.base import BaseAgent, AgentConfig, AgentResponse
-
+from app.services import ConversationService
 
 class EscalationPriority(str, Enum):
     """Escalation priority levels."""
@@ -31,9 +31,11 @@ class HumanAgent(BaseAgent):
     - Escalation tracking
     """
 
-    def __init__(self, config: Optional[AgentConfig] = None):
+    def __init__(self, config: Optional[AgentConfig] = None, conversation_service: ConversationService = None,
+    **kwargs):
         """Initialize human agent."""
         super().__init__(name="human_agent", config=config)
+        self.conversation_service = conversation_service or ConversationService()
 
     # ========================================================================
     # ABSTRACT METHOD IMPLEMENTATIONS

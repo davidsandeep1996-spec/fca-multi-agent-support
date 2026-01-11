@@ -17,6 +17,12 @@ from app.agents.general_agent import GeneralAgent
 from app.agents.human_agent import HumanAgent
 from app.agents.product_recommender import ProductRecommenderAgent
 from app.agents.compliance_checker import ComplianceCheckerAgent
+from app.services import (
+    AccountService,
+    CustomerService,
+    TransactionService,
+    ProductService,
+)
 
 
 class WorkflowState(str, Enum):
@@ -45,17 +51,18 @@ class MessageWorkflow:
     3. Response formatting
     """
 
-    def __init__(self):
-        """Initialize workflow with all agents."""
-        self.logger = logging.getLogger(__name__)
-
-        # Initialize all agents
+    def __init__(self, *, account_service, customer_service, transaction_service, product_service):
         self.intent_classifier = IntentClassifierAgent()
-        self.account_agent = AccountAgent()
+        self.account_agent = AccountAgent(
+            account_service=account_service,
+            customer_service=customer_service,
+            transaction_service=transaction_service,
+        )
         self.general_agent = GeneralAgent()
-        self.product_agent = ProductRecommenderAgent()
+        self.product_agent = ProductRecommenderAgent(product_service=product_service)
         self.compliance_agent = ComplianceCheckerAgent()
         self.human_agent = HumanAgent()
+
 
         # Build LangGraph workflow
         self.graph = self._build_graph()

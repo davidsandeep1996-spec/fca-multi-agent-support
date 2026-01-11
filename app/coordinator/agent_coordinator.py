@@ -10,8 +10,14 @@ from datetime import datetime
 import logging
 
 from app.workflows.message_workflow import MessageWorkflow
-
-
+from app.database import AsyncSessionLocal
+from app.services import (
+            AccountService,
+            CustomerService,
+            ProductService,
+            ConversationService,
+            TransactionService,
+        )
 class ConversationMessage:
     """Single message in conversation."""
 
@@ -96,11 +102,23 @@ class AgentCoordinator:
     - Persistence
     """
 
-    def __init__(self):
+    def __init__(self,
+    account_service=None,
+    customer_service=None,
+    product_service=None,
+    conversation_service=None,
+                 ):
         """Initialize coordinator."""
         self.logger = logging.getLogger(__name__)
-        self.workflow = MessageWorkflow()
         self.conversations: Dict[int, ConversationContext] = {}
+
+            # Initialize services
+
+
+        self.account_service = account_service or AccountService()
+        self.customer_service = customer_service or CustomerService()
+        self.product_service = product_service or ProductService()
+        self.conversation_service = conversation_service or ConversationService()
 
     # ========================================================================
     # CONVERSATION MANAGEMENT
@@ -121,45 +139,53 @@ class AgentCoordinator:
 
         return self.conversations[conversation_id]
 
-    async def process_message(
-        self,
-        message: str,
-        customer_id: int,
-        conversation_id: int,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """
-        Process message through workflow and persist.
-
-        Args:
-            message: Customer message
-            customer_id: Customer ID
-            conversation_id: Conversation ID
-            context: Optional context
-
-        Returns:
-            dict: Coordinated response
-        """
+    async def process_message(self, message: str, customer_id: int, conversation_id: int, context=None):
         self.logger.info(f"\n🔄 Coordinating message for customer {customer_id}")
 
-        # Get or create conversation
         conv_context = self.get_or_create_conversation(customer_id, conversation_id)
 
-        # Route through workflow
-        workflow_response = await self.workflow.process_message(
-            message=message,
-            customer_id=customer_id,
-            conversation_id=conversation_id,
-            context=context,
-        )
+        if context is None:
+            context = {}
 
-        # Extract response data
+        async with AsyncSessionLocal() as session:
+            account_service = AccountService(db=session)
+            customer_service = CustomerService(db=session)
+            transaction_service = TransactionService(db=session)
+            product_service = ProductService(db=session)
+
+            # build workflow WITH db-backed services
+            workflow = MessageWorkflow(
+                account_service=account_service,
+                customer_service=customer_service,
+                transaction_service=transaction_service,
+                product_service=product_service,
+            )
+
+            # IMPORTANT: update context with the db-backed services (not self.*)
+            context.update({
+                "account_service": account_service,
+                "customer_service": customer_service,
+                "transaction_service": transaction_service,
+                "product_service": product_service,
+                # keep these only if they exist and are DB-safe in your project:
+                # "compliance_service": ...,
+                # "conversation_service": ...,
+            })
+
+            # IMPORTANT: call the local workflow, not self.workflow
+            workflow_response = await workflow.process_message(
+                message=message,
+                customer_id=customer_id,
+                conversation_id=conversation_id,
+                context=context,
+            )
+
+        # everything below stays the same (uses workflow_response)
         agent_type = workflow_response.get("agent")
         response_text = workflow_response.get("message")
         intent = workflow_response.get("intent")
         confidence = workflow_response.get("confidence", 0.0)
 
-        # Add to conversation history
         conv_context.add_message(
             message=message,
             agent_type=agent_type,
@@ -168,14 +194,16 @@ class AgentCoordinator:
             confidence=confidence,
         )
 
-        # Check for escalation
         escalation_id = workflow_response.get("metadata", {}).get("escalation_id")
         if escalation_id:
             conv_context.mark_escalated(escalation_id)
             self.logger.info(f"⚠️ Escalation detected: {escalation_id}")
 
-        # Build coordinated response
-        coordinated_response = {
+
+        self.logger.info(f"✅ Message processed: {agent_type} agent, turn #{len(conv_context.messages)}")
+
+
+        return {
             "response": response_text,
             "agent": agent_type,
             "intent": intent,
@@ -186,9 +214,7 @@ class AgentCoordinator:
             "escalation_id": escalation_id,
         }
 
-        self.logger.info(f"✅ Message processed: {agent_type} agent, turn #{len(conv_context.messages)}")
-
-        return coordinated_response
+ 
 
     # ========================================================================
     # PERSISTENCE & RETRIEVAL

@@ -8,6 +8,9 @@ from typing import Dict, Any, Optional, List
 from groq import AsyncGroq
 
 from app.agents.base import BaseAgent, AgentConfig, AgentResponse
+from app.services import ProductService
+
+
 
 
 class IntentClassifierAgent(BaseAgent):
@@ -62,7 +65,7 @@ class IntentClassifierAgent(BaseAgent):
                 "My card was stolen!",
                 "I need immediate help!",
                 "This is urgent!",
-                "Emergency! My card is missing!" 
+                "Emergency! My card is missing!"
             ],
             "routing": "human_agent",
         },
@@ -81,12 +84,16 @@ class IntentClassifierAgent(BaseAgent):
         },
     }
 
-    def __init__(self, config: Optional[AgentConfig] = None):
+    def __init__(self, config: Optional[AgentConfig] = None,
+                 product_service: ProductService = None,
+    **kwargs):
         """Initialize intent classifier agent."""
         super().__init__(name="intent_classifier", config=config)
 
         # Initialize Groq client
         self.client = AsyncGroq(api_key=self.config.api_key)
+        self.product_service = product_service or ProductService()
+
 
     # ========================================================================
     # ABSTRACT METHOD IMPLEMENTATIONS

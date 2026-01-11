@@ -113,6 +113,7 @@ class BaseAgent(ABC):
         self,
         name: str,
         config: Optional[AgentConfig] = None,
+        services: Optional[Dict[str, Any]] = None
     ):
         """
         Initialize base agent.
@@ -124,6 +125,7 @@ class BaseAgent(ABC):
         self.name = name
         self.config = config or AgentConfig()
         self.logger = logging.getLogger(f"agent.{name}")
+        self.services = services or {}
 
         # Agent metadata
         self.description = self._get_description()

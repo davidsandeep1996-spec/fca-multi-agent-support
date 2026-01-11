@@ -12,14 +12,30 @@ from app.agents.general_agent import GeneralAgent
 from app.agents.account_agent import AccountAgent
 from app.agents.human_agent import HumanAgent
 
+# Services for dependency injection
+from app.services import (
+    AccountService,
+    CustomerService,
+    TransactionService,
+    ProductService,
+    ConversationService,
+)
+
 __all__ = [
+    # Agents
     "BaseAgent",
     "AgentConfig",
     "AgentResponse",
+    "AccountAgent",
     "IntentClassifierAgent",
     "ProductRecommenderAgent",
     "ComplianceCheckerAgent",
-    "AccountAgent",
     "GeneralAgent",
     "HumanAgent",
+    # Services
+    "AccountService",
+    "CustomerService",
+    "TransactionService",
+    "ProductService",
+    "ConversationService",
 ]
