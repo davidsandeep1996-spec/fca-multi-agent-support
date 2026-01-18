@@ -106,9 +106,9 @@ async def init_db() -> None:
     """
     async with engine.begin() as conn:
         # Drop all tables (development only!)
-        if settings.is_development:
-            logger.warning("Dropping all database tables (development mode)")
-            await conn.run_sync(Base.metadata.drop_all)
+        #if settings.is_development:
+        #    logger.warning("Dropping all database tables (development mode)")
+        #    await conn.run_sync(Base.metadata.drop_all)
 
         # Create all tables
         logger.info("Creating database tables")
@@ -173,9 +173,3 @@ if __name__ == "__main__":
 
     # Run test
     asyncio.run(test_connection())
-
-
-
-
-
-

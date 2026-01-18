@@ -91,6 +91,9 @@ services:
         condition: service_healthy
     volumes:
       - ./logs:/app/logs
+      - ./app:/app/app          # <---  THIS (Syncs python code)
+      - ./alembic:/app/alembic  # <---  THIS (Syncs migrations)
+      - ./tests:/app/tests    # <---  THIS (Syncs tests)
     networks:
       - fca-network
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

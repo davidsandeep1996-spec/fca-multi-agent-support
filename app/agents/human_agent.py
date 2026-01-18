@@ -192,50 +192,53 @@ class HumanAgent(BaseAgent):
     ) -> Dict[str, Any]:
         """
         Create escalation record.
-
-        Args:
-            customer_id: Customer ID
-            conversation_id: Conversation ID
-            issue: Issue description
-            priority: Priority level
-            context: Optional context with conversation_service
-
-        Returns:
-            dict: Escalation record
         """
+        # 1. Get the Service from Context (This has the active DB session)
+        # We prioritize the one passed in 'context' because it's fresh.
+        conversation_service = None
+        if context:
+            conversation_service = context.get("conversation_service")
 
-        # Get conversation service
-        conversation_service = (
-            context.get("conversation_service") if context else None
-        )
+        # Fallback to self.conversation_service (likely empty, but good safety)
+        if not conversation_service:
+            conversation_service = self.conversation_service
+
+        ticket_id = f"ESC-{customer_id}-{int(datetime.utcnow().timestamp())}"
+        assigned_group = self._assign_specialist(priority)
 
         escalation = {
-            "id": f"ESC-{customer_id}-{int(datetime.utcnow().timestamp())}",
+            "id": ticket_id,
             "customer_id": customer_id,
             "conversation_id": conversation_id,
             "issue": issue,
             "priority": priority.value,
             "status": "open",
             "created_at": datetime.utcnow().isoformat(),
-            "assigned_to": None,
+            "assigned_to": assigned_group,
             "estimated_response": self._estimate_response_time(priority),
+            "saved": False # Default to False
         }
 
-        # Save escalation if service available
+        # 2. Save to DB (Only if service is valid)
         if conversation_service:
             try:
-                await conversation_service.escalate_conversation(
-                    conversation_id,
-                    reason=issue,
-                    priority=priority.value,
-                )
-                escalation["saved"] = True
+                # [CRITICAL CHECK] Ensure service has a DB session
+                if hasattr(conversation_service, 'db') and conversation_service.db is not None:
+                    await conversation_service.escalate_conversation(
+                        conversation_id,
+                        reason=issue,
+                        priority=priority.value,
+                        assigned_group=assigned_group,
+                        ticket_id=ticket_id
+                    )
+                    escalation["saved"] = True
+                    self.logger.info(f"Escalation saved to DB for conversation {conversation_id}")
+                else:
+                    self.logger.warning("ConversationService has no DB session. Cannot save escalation.")
             except Exception as e:
                 self.logger.warning(f"Could not save escalation: {e}")
-                escalation["saved"] = False
-
-        # Assign based on priority
-        escalation["assigned_to"] = self._assign_specialist(priority)
+        else:
+            self.logger.warning("No ConversationService available. Escalation is in-memory only.")
 
         return escalation
 

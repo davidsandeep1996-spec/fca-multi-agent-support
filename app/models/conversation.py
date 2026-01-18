@@ -129,6 +129,16 @@ class Conversation(BaseModel):
         comment="Reason for escalation (if escalated)",
     )
 
+    priority = Column(
+        String(20),
+        nullable=True,
+        comment="Priority of escalation (if escalated)",
+    )
+
+    # [FIX] Add new columns for escalation details
+    ticket_id = Column(String, index=True, nullable=True)
+    assigned_group = Column(String, nullable=True)
+
     # ========================================================================
     # RELATIONSHIPS
     # ========================================================================
@@ -229,6 +239,7 @@ class Conversation(BaseModel):
             "sentiment": self.sentiment,
             "message_count": self.message_count,
             "escalation_reason": self.escalation_reason,
+            "priority": self.priority,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -263,15 +274,20 @@ class Conversation(BaseModel):
         if summary:
             self.summary = summary
 
-    def escalate(self, reason: str) -> None:
+    def escalate(self, reason: str, priority: str = None, assigned_group: str = None, ticket_id: str = None) -> None:
         """
         Escalate conversation to human agent.
 
         Args:
             reason: Reason for escalation
+            priority: Priority of escalation (optional)
         """
         self.status = ConversationStatus.ESCALATED
         self.escalation_reason = reason
+        if priority:
+            self.priority = priority
+        self.assigned_group = assigned_group
+        self.ticket_id = ticket_id
 
     def close(self) -> None:
         """Close conversation."""

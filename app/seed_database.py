@@ -24,12 +24,15 @@ from faker import Faker
 from sqlalchemy import text
 
 from app.database import AsyncSessionLocal, engine, Base
+from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.customer import CustomerService
 from app.services.conversation import ConversationService
 from app.services.message import MessageService
 from app.services import ProductService, AccountService, TransactionService
 from app.models.conversation import ConversationChannel
 from app.models.message import MessageRole
+from app.models.faq import FAQ
 from app.models.account import AccountType, AccountStatus
 
 
@@ -71,16 +74,83 @@ def generate_customers(count: int = 100) -> list[dict]:
     return customers
 
 
+# app/seed_database.py
+
+from decimal import Decimal
+
 SAMPLE_PRODUCTS = [
+    # --- MORTGAGES ---
     {
-        "name": "Premium Savings Account",
-        "type": "savings",
-        "description": "Earn interest on your savings with flexible access",
-        "interest_rate": Decimal("2.50"),
-        "features": ["Interest payments", "Easy access", "No fees"],
-        "requirements": {"min_balance": 1000, "age": 18},
+        "name": "Fixed Rate Mortgage",
+        "type": "loan",  # DB uses generic 'loan' type or you can add 'mortgage' to Enum
+        "description": "Interest rate stays the same for agreed period",
+        "interest_rate": Decimal("3.99"),
+        "features": ["2, 3, 5, or 10 year fixed terms", "Suitable for first time buyers", "Stability"],
+        "requirements": {"min_deposit": 0.05, "min_income": 25000},
         "is_active": True,
     },
+    {
+        "name": "Tracker Mortgage",
+        "type": "loan",
+        "description": "Interest rate tracks Bank of England base rate (Base + 1.5%)",
+        "interest_rate": Decimal("5.50"),  # Approx 4.0 base + 1.5
+        "features": ["Flexible terms", "Tracks base rate", "Lower early repayment charges"],
+        "requirements": {"min_deposit": 0.10},
+        "is_active": True,
+    },
+
+    # --- SAVINGS ---
+    {
+        "name": "Instant Access Savings",
+        "type": "savings",
+        "description": "Access your money anytime without penalties",
+        "interest_rate": Decimal("4.25"),
+        "features": ["No fixed term", "Withdraw anytime", "Interest paid monthly"],
+        "requirements": {"min_balance": 1},
+        "is_active": True,
+    },
+    {
+        "name": "Fixed Rate Bond",
+        "type": "savings",
+        "description": "Fixed interest rate for set period (1-5 years)",
+        "interest_rate": Decimal("5.10"),
+        "features": ["Guaranteed return", "Higher interest rate", "Funds locked for term"],
+        "requirements": {"min_balance": 1000},
+        "is_active": True,
+    },
+
+    # --- CREDIT CARDS ---
+    {
+        "name": "Cashback Credit Card",
+        "type": "credit",
+        "description": "Earn cashback on everyday purchases",
+        "interest_rate": Decimal("21.9"),  # APR
+        "features": ["Up to 1% cashback", "No annual fee", "Fraud protection"],
+        "requirements": {"min_income": 20000},
+        "is_active": True,
+    },
+    {
+        "name": "Balance Transfer Card",
+        "type": "credit",
+        "description": "0% interest on transferred balances for 24 months",
+        "interest_rate": Decimal("0.0"),  # Promotional rate
+        "features": ["0% for 24 months", "3% transfer fee", "Debt consolidation tool"],
+        "requirements": {"credit_score": 700},
+        "is_active": True,
+    },
+
+    # --- LOANS ---
+    {
+        "name": "Personal Loan",
+        "type": "loan",
+        "description": "Unsecured loan for any purpose",
+        "interest_rate": Decimal("6.9"),
+        "features": ["Borrow £1k - £35k", "Terms 1-7 years", "Instant decision"],
+        "requirements": {"min_income": 20000},
+        "is_active": True,
+    },
+
+    # --- CURRENT ACCOUNTS (Keep this from original seed) ---
     {
         "name": "Current Account",
         "type": "current",
@@ -90,32 +160,93 @@ SAMPLE_PRODUCTS = [
         "requirements": {"age": 16},
         "is_active": True,
     },
+]
+
+SAMPLE_FAQS = [
     {
-        "name": "Travel Credit Card",
-        "type": "credit",
-        "description": "Rewards on every purchase",
-        "interest_rate": Decimal("9.99"),
-        "features": ["Cashback", "Travel insurance", "No foreign fees"],
-        "requirements": {"min_income": 25000},
-        "is_active": True,
+        "question": "How do I open an account?",
+        "answer": (
+            "To open an account with us:\n"
+            "1. Visit our website or mobile app\n"
+            "2. Click 'Open Account'\n"
+            "3. Provide personal information\n"
+            "4. Verify your identity\n"
+            "5. Fund your account\n\n"
+            "The process takes about 10 minutes."
+        ),
+        "category": "account",
+        "keywords": "open, join, register, new account"
     },
     {
-        "name": "Personal Loan",
-        "type": "loan",
-        "description": "Borrow up to £50,000 at competitive rates",
-        "interest_rate": Decimal("7.49"),
-        "features": ["Flexible terms", "Quick approval", "No early repayment penalty"],
-        "requirements": {"min_income": 30000, "credit_score": 600},
-        "is_active": True,
+        "question": "How do I contact support?",
+        "answer": (
+            "You can contact our support team at:\n"
+            "📞 Phone: +44-20-XXXX-XXXX\n"
+            "📧 Email: support@fca-bank.com\n"
+            "💬 Live Chat: Available 9am-6pm weekdays\n"
+            "🕐 Hours: Monday-Friday, 9am-6pm GMT\n\n"
+            "Our team typically responds within 24 hours."
+        ),
+        "category": "support",
+        "keywords": "phone, email, chat, help, contact"
     },
     {
-        "name": "Fixed Rate Bond",
-        "type": "savings",
-        "description": "Guaranteed returns on your investment",
-        "interest_rate": Decimal("4.25"),
-        "features": ["Fixed returns", "1-year term", "FSCS protected"],
-        "requirements": {"min_balance": 5000},
-        "is_active": True,
+        "question": "What are your account fees?",
+        "answer": (
+            "We offer fee-free banking:\n"
+            "✅ No monthly account fees\n"
+            "✅ No transfer fees (domestic)\n"
+            "✅ No ATM fees at partner ATMs\n"
+            "⚠️ International transfers: £10 + exchange rate\n"
+            "⚠️ Overdraft charges apply\n\n"
+            "See our full fee schedule at bank.com/fees"
+        ),
+        "category": "fees",
+        "keywords": "cost, charge, free, overdraft, transfer fee"
+    },
+    {
+        "question": "What interest rates do you offer?",
+        "answer": (
+            "Current Interest Rates:\n"
+            "💰 Savings Account: Up to 4.5% AER\n"
+            "💰 Fixed Bond 1-year: 5.1% AER\n"
+            "💰 Fixed Bond 3-year: 4.8% AER\n"
+            "💳 Credit Cards: 21.9% APR (representative)\n"
+            "📌 Mortgage: From 3.99% APR\n\n"
+            "Rates subject to change. See full rates at bank.com/rates"
+        ),
+        "category": "products",
+        "keywords": "rate, interest, apr, aer, mortgage rate"
+    },
+    {
+        "question": "Is my money safe with you?",
+        "answer": (
+            "Your money is protected:\n"
+            "🔒 FSCS Protected: Up to £85,000\n"
+            "🔐 256-bit Encryption\n"
+            "🛡️ Multi-factor Authentication\n"
+            "📋 FCA Regulated\n"
+            "🔍 Regular Security Audits\n\n"
+            "We take security seriously."
+        ),
+        "category": "security",
+        "keywords": "safe, secure, fraud, protection, fscs"
+    },
+    {
+        "question": "What can I do in the mobile app?",
+        "answer": (
+            "Available features:\n"
+            "✅ Check balance and transactions\n"
+            "✅ Transfer money\n"
+            "✅ Pay bills\n"
+            "✅ Apply for products\n"
+            "✅ Contact support\n"
+            "✅ View statements\n"
+            "✅ Manage cards\n\n"
+            "Download from App Store or Google Play"
+        ),
+        "category": "digital",
+        "keywords": "app, mobile, features, download, phone"
     },
 ]
 
@@ -165,6 +296,19 @@ async def seed_customers(count: int = 100) -> list[int]:
 
     logger.info(f"📊 Seeded {len(customer_ids)}/{count} customers ({customers_failed} failed)\n")
     return customer_ids
+
+async def seed_faqs(session: AsyncSession):
+    """Seed FAQ data."""
+    logger.info("🌱 Seeding FAQs...")
+    # Delete existing
+    await session.execute(delete(FAQ))
+
+    for f_data in SAMPLE_FAQS:
+        faq = FAQ(**f_data)
+        session.add(faq)
+
+    await session.commit()
+    logger.info(f"✅ Seeded {len(SAMPLE_FAQS)} FAQs")
 
 
 async def seed_products() -> list[int]:
@@ -439,6 +583,8 @@ async def seed_all(clear_first: bool = False, customer_count: int = 100) -> None
         trans_count = await seed_transactions(account_ids)
         conv_ids = await seed_conversations(customer_ids)
         message_count = await seed_messages(conv_ids)
+        async with AsyncSessionLocal() as session:
+            await seed_faqs(session)
 
         logger.info("=" * 70)
         logger.info("✅ DATABASE SEEDING COMPLETED SUCCESSFULLY!")

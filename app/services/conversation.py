@@ -23,8 +23,11 @@ class ConversationService(BaseService):
     def __init__(self, db: AsyncSession = None):
         """Initialize conversation service."""
         super().__init__(db)
-        self.repo = None
-        self.customer_repo = None
+# 👇 THIS WAS LIKELY MISSING OR BROKEN 👇
+        if self.db:
+            self.repo = ConversationRepository(self.db)
+        else:
+            self.repo = None
 
     async def __aenter__(self):
         """Enter async context."""
@@ -135,23 +138,25 @@ class ConversationService(BaseService):
     async def escalate_conversation(
         self,
         conversation_id: int,
-        reason: str
+        reason: str,
+        priority: str,
+        assigned_group: str = None,  # [FIX] New Arg
+        ticket_id: str = None        # [FIX] New Arg
     ) -> Optional[Conversation]:
-        """
-        Escalate conversation to human agent.
+        """Escalate with full tracking details."""
 
-        Args:
-            conversation_id: Conversation ID
-            reason: Escalation reason
-
-        Returns:
-            Conversation or None: Escalated conversation
-        """
         conversation = await self.repo.get_by_id(conversation_id)
-        if not conversation:
-            return None
 
-        conversation.escalate(reason=reason)
-        await self.commit()
+        if conversation:
+            # Pass all data to the model
+            conversation.escalate(
+                reason=reason,
+                priority=priority,
+                assigned_group=assigned_group,
+                ticket_id=ticket_id
+            )
+
+            await self.repo.session.commit()
+            await self.repo.session.refresh(conversation)
 
         return conversation

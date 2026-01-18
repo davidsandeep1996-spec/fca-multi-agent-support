@@ -11,6 +11,7 @@ from app.repositories.message import MessageRepository
 from app.repositories.account import AccountRepository
 from app.repositories.transaction import TransactionRepository
 from app.repositories.product import ProductRepository
+from app.repositories.faq import FAQRepository
 
 __all__ = [
     "BaseRepository",
@@ -20,4 +21,5 @@ __all__ = [
     "AccountRepository",
     "TransactionRepository",
     "ProductRepository",
+    "FAQRepository"
 ]

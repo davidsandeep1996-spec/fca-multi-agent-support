@@ -17,6 +17,7 @@ from app.services import (
             ProductService,
             ConversationService,
             TransactionService,
+            FAQService,
         )
 class ConversationMessage:
     """Single message in conversation."""
@@ -119,6 +120,8 @@ class AgentCoordinator:
         self.customer_service = customer_service or CustomerService()
         self.product_service = product_service or ProductService()
         self.conversation_service = conversation_service or ConversationService()
+        self.transaction_service = TransactionService()
+        self.faq_service = FAQService()
 
     # ========================================================================
     # CONVERSATION MANAGEMENT
@@ -152,6 +155,9 @@ class AgentCoordinator:
             customer_service = CustomerService(db=session)
             transaction_service = TransactionService(db=session)
             product_service = ProductService(db=session)
+            conversation_service = ConversationService(db=session)
+            # IMPORTANT: initialize faq_service with db session
+            faq_service = FAQService(db=session)
 
             # build workflow WITH db-backed services
             workflow = MessageWorkflow(
@@ -159,6 +165,8 @@ class AgentCoordinator:
                 customer_service=customer_service,
                 transaction_service=transaction_service,
                 product_service=product_service,
+                conversation_service=conversation_service,
+                faq_service=faq_service
             )
 
             # IMPORTANT: update context with the db-backed services (not self.*)
@@ -169,7 +177,7 @@ class AgentCoordinator:
                 "product_service": product_service,
                 # keep these only if they exist and are DB-safe in your project:
                 # "compliance_service": ...,
-                # "conversation_service": ...,
+                "conversation_service": conversation_service,
             })
 
             # IMPORTANT: call the local workflow, not self.workflow
@@ -214,7 +222,7 @@ class AgentCoordinator:
             "escalation_id": escalation_id,
         }
 
- 
+
 
     # ========================================================================
     # PERSISTENCE & RETRIEVAL

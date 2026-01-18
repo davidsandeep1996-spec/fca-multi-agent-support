@@ -4,7 +4,7 @@ Conversation Repository
 Data access layer for Conversation model.
 """
 
-from typing import List
+from typing import List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -91,4 +91,25 @@ class ConversationRepository(BaseRepository[Conversation]):
             .limit(limit)
             .order_by(Conversation.updated_at.asc())  # Oldest first
         )
+        return result.scalars().all()
+    async def get_by_ticket_id(self, ticket_id: str) -> Optional[Conversation]:
+        """
+        [NEW] Fast lookup for when a customer quotes their ticket number.
+        Example: repo.get_by_ticket_id("ESC-101-12345")
+        """
+        query = select(self.model).where(self.model.ticket_id == ticket_id)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def get_escalated_by_group(self, assigned_group: str) -> List[Conversation]:
+        """
+        [NEW] Dashboard view for specific teams.
+        Example: repo.get_escalated_by_group("Security & Fraud Team")
+        """
+        query = select(self.model).where(
+            self.model.status == ConversationStatus.ESCALATED,
+            self.model.assigned_group == assigned_group
+        ).order_by(self.model.updated_at.desc()) # Show newest first
+
+        result = await self.session.execute(query)
         return result.scalars().all()

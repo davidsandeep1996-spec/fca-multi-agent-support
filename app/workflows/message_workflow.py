@@ -22,6 +22,8 @@ from app.services import (
     CustomerService,
     TransactionService,
     ProductService,
+    ConversationService,
+    FAQService,
 )
 
 
@@ -51,17 +53,19 @@ class MessageWorkflow:
     3. Response formatting
     """
 
-    def __init__(self, *, account_service, customer_service, transaction_service, product_service):
+    def __init__(self, *, account_service, customer_service, transaction_service, product_service, conversation_service, faq_service):
         self.intent_classifier = IntentClassifierAgent()
         self.account_agent = AccountAgent(
             account_service=account_service,
             customer_service=customer_service,
             transaction_service=transaction_service,
+            faq_service=faq_service
         )
-        self.general_agent = GeneralAgent()
+        self.general_agent = GeneralAgent(faq_service=faq_service)
         self.product_agent = ProductRecommenderAgent(product_service=product_service)
         self.compliance_agent = ComplianceCheckerAgent()
-        self.human_agent = HumanAgent()
+        self.human_agent = HumanAgent(conversation_service=conversation_service)
+        self.logger = logging.getLogger(__name__)
 
 
         # Build LangGraph workflow
@@ -239,12 +243,18 @@ class MessageWorkflow:
         customer_id = state.get("customer_id")
         conversation_id = state.get("conversation_id", 0)
 
+        context = state.get("context", {})
+
+
+
+
         # Run human agent
         response = await self.human_agent.process({
             "message": message,
             "customer_id": customer_id,
             "conversation_id": conversation_id,
-        })
+
+        }, context=context)
 
         state["agent_type"] = "human"
         state["agent_response"] = response.content
