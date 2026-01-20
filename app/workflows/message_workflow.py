@@ -7,10 +7,11 @@ Routes messages through Intent Classifier → Specialized Agents.
 
 from typing import Dict, Any, Optional, List
 from enum import Enum
+from pydantic import BaseModel, Field, ConfigDict
 import logging
 
 from langgraph.graph import StateGraph, END
-
+from app.schemas.common import WorkflowState
 from app.agents.intent_classifier import IntentClassifierAgent
 from app.agents.account_agent import AccountAgent
 from app.agents.general_agent import GeneralAgent
@@ -27,16 +28,7 @@ from app.services import (
 )
 
 
-class WorkflowState(str, Enum):
-    """Workflow states."""
-    START = "start"
-    CLASSIFY = "classify"
-    ACCOUNT = "account"
-    GENERAL = "general"
-    PRODUCT = "product"
-    COMPLIANCE = "compliance"
-    HUMAN = "human"
-    END = "end"
+
 
 
 class MessageWorkflow:
@@ -76,7 +68,7 @@ class MessageWorkflow:
         """Build LangGraph state machine."""
 
         # Create state graph
-        workflow = StateGraph(dict)
+        workflow = StateGraph(WorkflowState)
 
         # Define nodes
         workflow.add_node("classify", self._node_classify)
@@ -121,179 +113,191 @@ class MessageWorkflow:
     # NODE IMPLEMENTATIONS
     # ========================================================================
 
-    async def _node_classify(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    async def _node_classify(self, state: WorkflowState) -> Dict[str, Any]:
         """Classify intent."""
         self.logger.info("📋 Classifying message intent...")
 
-        message = state.get("message")
-        customer_id = state.get("customer_id")
+        # 1. READ from State (using dot notation)
+        message = state.message
+        # customer_id = state.customer_id (not needed for classification logic, but available)
 
-        # Run intent classifier
+        # 2. PROCESS
         classification = await self.intent_classifier.process({
             "message": message,
         })
 
-        # Extract intent
         intent = classification.metadata.get("intent", "general_inquiry")
         confidence = classification.confidence
 
-        # Update state
-        state["intent"] = intent
-        state["intent_confidence"] = confidence
-        state["classifier_response"] = classification.content
-
         self.logger.info(f"✅ Intent: {intent} (confidence: {confidence:.2f})")
 
-        return state
+        # 3. RETURN UPDATES (LangGraph merges this into the Pydantic model for you)
+        return {
+            "intent": intent,
+            "intent_confidence": confidence,
+            "classifier_response": classification.content
+        }
 
-    async def _node_account(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    async def _node_account(self, state: WorkflowState) -> Dict[str, Any]:
         """Handle account inquiries."""
         self.logger.info("🏦 Processing account inquiry...")
 
-        message = state.get("message")
-        customer_id = state.get("customer_id")
+        # 1. READ (Dot notation is correct here)
+        message = state.message
+        customer_id = state.customer_id
 
-        # Run account agent
+        # 2. PROCESS
         response = await self.account_agent.process({
             "customer_id": customer_id,
             "message": message,
         })
 
-        state["agent_type"] = "account"
-        state["agent_response"] = response.content
-        state["agent_metadata"] = response.metadata
-        state["confidence"] = response.confidence
-
         self.logger.info(f"✅ Account query handled: {response.metadata.get('query_type')}")
 
-        return state
-
-    async def _node_general(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        # 3. RETURN UPDATES (Return a dict, do not mutate state)
+        return {
+            "agent_type": "account",
+            "agent_response": response.content,
+            "agent_metadata": response.metadata,
+            "confidence": response.confidence
+        }
+    async def _node_general(self, state: WorkflowState) -> Dict[str, Any]:
         """Handle general inquiries."""
         self.logger.info("❓ Processing general inquiry...")
 
-        message = state.get("message")
+        # 1. READ from State
+        message = state.message
 
-        # Run general agent
+        # 2. PROCESS
         response = await self.general_agent.process({
             "message": message,
         })
 
-        state["agent_type"] = "general"
-        state["agent_response"] = response.content
-        state["agent_metadata"] = response.metadata
-        state["confidence"] = response.confidence
-
         self.logger.info(f"✅ General inquiry handled: {response.metadata.get('source')}")
 
-        return state
+        # 3. RETURN UPDATES
+        return {
+            "agent_type": "general",
+            "agent_response": response.content,
+            "agent_metadata": response.metadata,
+            "confidence": response.confidence
+        }
 
-    async def _node_product(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    async def _node_product(self, state: WorkflowState) -> Dict[str, Any]:
         """Handle product recommendations."""
         self.logger.info("💼 Processing product inquiry...")
 
-        message = state.get("message")
-        customer_id = state.get("customer_id")
+        # 1. READ from State
+        message = state.message
+        customer_id = state.customer_id
 
-        # Run product recommender
+        # 2. PROCESS
         response = await self.product_agent.process({
             "customer_id": customer_id,
             "message": message,
         })
 
-        state["agent_type"] = "product"
-        state["agent_response"] = response.content
-        state["agent_metadata"] = response.metadata
-        state["confidence"] = response.confidence
-
         self.logger.info(f"✅ Product recommendation generated")
 
-        return state
+        # 3. RETURN UPDATES
+        return {
+            "agent_type": "product",
+            "agent_response": response.content,
+            "agent_metadata": response.metadata,
+            "confidence": response.confidence
+        }
 
-    async def _node_compliance(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    async def _node_compliance(self, state: WorkflowState) -> Dict[str, Any]:
         """Check compliance of product recommendations."""
         self.logger.info("⚖️ Checking FCA compliance...")
 
-        agent_response = state.get("agent_response")
+        # 1. READ from State
+        agent_response = state.agent_response
+        products = state.agent_metadata.get("products")
 
-        # Run compliance checker
+        # 2. PROCESS
         response = await self.compliance_agent.process({
             "content": agent_response,
-            "product_type": state.get("agent_metadata", {}).get("products"),
+            "product_type": products,
         })
 
-        state["compliance_check"] = response.content
-        state["is_compliant"] = response.metadata.get("is_compliant")
-        state["required_disclaimers"] = response.metadata.get("required_disclaimers", [])
+        is_compliant = response.metadata.get("is_compliant")
+        required_disclaimers = response.metadata.get("required_disclaimers", [])
 
-        # Append disclaimers to agent response if not compliant
-        if not state["is_compliant"]:
-            disclaimers = "\n\n".join(state["required_disclaimers"])
-            state["agent_response"] = f"{agent_response}\n\n⚠️ Important:\n{disclaimers}"
+        # Prepare updates
+        updates = {
+            "compliance_check": response.content,
+            "is_compliant": is_compliant,
+            "required_disclaimers": required_disclaimers
+        }
 
-        self.logger.info(f"✅ Compliance check: {'✅ PASS' if state['is_compliant'] else '❌ NEEDS REVISION'}")
+        # Logic: Append disclaimers to agent response if not compliant
+        if not is_compliant:
+            disclaimers = "\n\n".join(required_disclaimers)
+            updates["agent_response"] = f"{agent_response}\n\n⚠️ Important:\n{disclaimers}"
 
-        return state
+        self.logger.info(f"✅ Compliance check: {'✅ PASS' if is_compliant else '❌ NEEDS REVISION'}")
 
-    async def _node_human(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        # 3. RETURN UPDATES
+        return updates
+
+    async def _node_human(self, state: WorkflowState) -> Dict[str, Any]:
         """Escalate to human agent."""
         self.logger.info("👤 Escalating to human specialist...")
 
-        message = state.get("message")
-        customer_id = state.get("customer_id")
-        conversation_id = state.get("conversation_id", 0)
+        # 1. READ from State
+        message = state.message
+        customer_id = state.customer_id
+        conversation_id = state.conversation_id
+        context = state.context
 
-        context = state.get("context", {})
-
-
-
-
-        # Run human agent
+        # 2. PROCESS
         response = await self.human_agent.process({
             "message": message,
             "customer_id": customer_id,
             "conversation_id": conversation_id,
-
         }, context=context)
-
-        state["agent_type"] = "human"
-        state["agent_response"] = response.content
-        state["agent_metadata"] = response.metadata
-        state["confidence"] = response.confidence
 
         self.logger.info(f"✅ Escalation created: {response.metadata.get('escalation_id')}")
 
-        return state
+        # 3. RETURN UPDATES
+        return {
+            "agent_type": "human",
+            "agent_response": response.content,
+            "agent_metadata": response.metadata,
+            "confidence": response.confidence
+        }
 
-    async def _node_end(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    async def _node_end(self, state: WorkflowState) -> Dict[str, Any]:
         """Final response formatting."""
         self.logger.info("📤 Formatting final response...")
 
-        # Build final response object
-        state["final_response"] = {
-            "message": state.get("agent_response"),
-            "agent": state.get("agent_type"),
-            "intent": state.get("intent"),
-            "confidence": state.get("confidence"),
+        # 1. CONSTRUCT FINAL RESPONSE (Reading from Pydantic state)
+        final_response = {
+            "message": state.agent_response,
+            "agent": state.agent_type,
+            "intent": state.intent,
+            "confidence": state.confidence,
             "metadata": {
-                "intent_confidence": state.get("intent_confidence"),
-                "agent_metadata": state.get("agent_metadata"),
-                "is_compliant": state.get("is_compliant", True),
-                "escalation_id": state.get("agent_metadata", {}).get("escalation_id"),
+                "intent_confidence": state.intent_confidence,
+                "agent_metadata": state.agent_metadata,
+                "is_compliant": state.is_compliant,
+                "escalation_id": state.agent_metadata.get("escalation_id"),
             }
         }
 
         self.logger.info("✅ Response ready to send")
 
-        return state
+        # 3. RETURN UPDATES
+        return {"final_response": final_response}
 
     # ========================================================================
     # ROUTING LOGIC
     # ========================================================================
 
-    def _route_by_intent(self, state: Dict[str, Any]) -> str:
+    def _route_by_intent(self, state: WorkflowState) -> str:
         """Route to agent based on intent."""
-        intent = state.get("intent", "general_inquiry")
+        intent = state.intent or "general_inquiry"
 
         intent_map = {
             "account_inquiry": "account",

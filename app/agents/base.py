@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 import logging
-
+from app.schemas.common import AgentResponse
 from app.config import settings
 
 
@@ -51,54 +51,6 @@ class AgentConfig:
             "timeout": self.timeout,
         }
 
-
-class AgentResponse:
-    """
-    Agent response wrapper.
-
-    Standardized response format from all agents.
-    """
-
-    def __init__(
-        self,
-        content: str,
-        metadata: Optional[Dict[str, Any]] = None,
-        confidence: Optional[float] = None,
-        agent_name: Optional[str] = None,
-    ):
-        """
-        Initialize agent response.
-
-        Args:
-            content: Response content/text
-            metadata: Additional metadata
-            confidence: Confidence score (0-1)
-            agent_name: Name of agent that generated response
-        """
-        self.content = content
-        self.metadata = metadata or {}
-        self.confidence = confidence
-        self.agent_name = agent_name
-        self.timestamp = datetime.utcnow()
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert response to dictionary."""
-        return {
-            "content": self.content,
-            "metadata": self.metadata,
-            "confidence": self.confidence,
-            "agent_name": self.agent_name,
-            "timestamp": self.timestamp.isoformat(),
-        }
-
-    def __repr__(self) -> str:
-        """String representation."""
-        return (
-            f"<AgentResponse("
-            f"agent='{self.agent_name}', "
-            f"confidence={self.confidence}, "
-            f"content='{self.content[:50]}...')>"
-        )
 
 
 class BaseAgent(ABC):

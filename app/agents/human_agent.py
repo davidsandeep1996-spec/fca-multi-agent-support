@@ -8,7 +8,7 @@ Handles complaints and complex issues.
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from enum import Enum
-
+from pydantic import BaseModel
 from app.agents.base import BaseAgent, AgentConfig, AgentResponse
 from app.services import ConversationService
 
@@ -18,6 +18,21 @@ class EscalationPriority(str, Enum):
     MEDIUM = "medium"
     HIGH = "high"
     URGENT = "urgent"
+
+class EscalationTicket(BaseModel):
+    id: str
+    customer_id: int
+    conversation_id: int
+    issue: str
+    priority: str
+    status: str = "open"
+    assigned_to: str
+    estimated_response: str
+    saved: bool
+    created_at: str
+
+
+
 
 
 class HumanAgent(BaseAgent):
@@ -113,10 +128,10 @@ class HumanAgent(BaseAgent):
                 content=response_content,
                 metadata={
                     "escalated": True,
-                    "escalation_id": escalation.get("id"),
+                    "escalation_id": escalation.id,
                     "priority": priority.value,
-                    "assigned_to": escalation.get("assigned_to"),
-                    "estimated_response": escalation.get("estimated_response"),
+                    "assigned_to": escalation.assigned_to,
+                    "estimated_response": escalation.estimated_response,
                 },
                 confidence=0.98,
             )
@@ -189,35 +204,22 @@ class HumanAgent(BaseAgent):
         issue: str,
         priority: EscalationPriority,
         context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+    ) -> EscalationTicket:
         """
-        Create escalation record.
+        Create escalation record with Pydantic validation.
         """
         # 1. Get the Service from Context (This has the active DB session)
-        # We prioritize the one passed in 'context' because it's fresh.
         conversation_service = None
         if context:
             conversation_service = context.get("conversation_service")
 
-        # Fallback to self.conversation_service (likely empty, but good safety)
+        # Fallback to self.conversation_service
         if not conversation_service:
             conversation_service = self.conversation_service
 
         ticket_id = f"ESC-{customer_id}-{int(datetime.utcnow().timestamp())}"
         assigned_group = self._assign_specialist(priority)
-
-        escalation = {
-            "id": ticket_id,
-            "customer_id": customer_id,
-            "conversation_id": conversation_id,
-            "issue": issue,
-            "priority": priority.value,
-            "status": "open",
-            "created_at": datetime.utcnow().isoformat(),
-            "assigned_to": assigned_group,
-            "estimated_response": self._estimate_response_time(priority),
-            "saved": False # Default to False
-        }
+        saved_status = False
 
         # 2. Save to DB (Only if service is valid)
         if conversation_service:
@@ -231,7 +233,7 @@ class HumanAgent(BaseAgent):
                         assigned_group=assigned_group,
                         ticket_id=ticket_id
                     )
-                    escalation["saved"] = True
+                    saved_status = True
                     self.logger.info(f"Escalation saved to DB for conversation {conversation_id}")
                 else:
                     self.logger.warning("ConversationService has no DB session. Cannot save escalation.")
@@ -240,8 +242,19 @@ class HumanAgent(BaseAgent):
         else:
             self.logger.warning("No ConversationService available. Escalation is in-memory only.")
 
-        return escalation
-
+        # 3. RETURN PYDANTIC MODEL (Not a dict)
+        return EscalationTicket(
+            id=ticket_id,
+            customer_id=customer_id,
+            conversation_id=conversation_id,
+            issue=issue,
+            priority=priority.value,
+            status="open",
+            created_at=datetime.utcnow().isoformat(),
+            assigned_to=assigned_group,
+            estimated_response=self._estimate_response_time(priority),
+            saved=saved_status
+        )
     def _estimate_response_time(self, priority: EscalationPriority) -> str:
         """
         Estimate response time based on priority.
@@ -279,7 +292,7 @@ class HumanAgent(BaseAgent):
         return teams.get(priority, "Support Team")
 
     def _generate_escalation_response(
-        self, escalation: Dict[str, Any], priority: EscalationPriority
+        self, escalation: EscalationTicket, priority: EscalationPriority
     ) -> str:
         """
         Generate response message for escalation.
@@ -293,9 +306,9 @@ class HumanAgent(BaseAgent):
         """
         response = (
             f"Thank you for bringing this to our attention.\n\n"
-            f"We've escalated your issue to our {escalation['assigned_to']}.\n\n"
-            f"📋 Reference Number: {escalation['id']}\n"
-            f"⏱️  Estimated Response: {escalation['estimated_response']}\n"
+            f"We've escalated your issue to our {escalation.assigned_to}.\n\n"
+            f"📋 Reference Number: {escalation.id}\n"
+            f"⏱️  Estimated Response: {escalation.estimated_response}\n"
             f"🔔 Priority: {priority.value.upper()}\n\n"
         )
 

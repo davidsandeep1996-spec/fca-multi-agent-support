@@ -8,6 +8,7 @@ Coordinates multi-agent responses across conversation turns.
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 import logging
+from pydantic import BaseModel, Field
 
 from app.workflows.message_workflow import MessageWorkflow
 from app.database import AsyncSessionLocal
@@ -19,38 +20,29 @@ from app.services import (
             TransactionService,
             FAQService,
         )
-class ConversationMessage:
+class ConversationMessage(BaseModel):
     """Single message in conversation."""
 
-    def __init__(
-        self,
-        customer_id: int,
-        message: str,
-        agent_type: str,
-        response: str,
-        intent: str,
-        confidence: float,
-    ):
-        self.timestamp = datetime.utcnow()
-        self.customer_id = customer_id
-        self.message = message
-        self.agent_type = agent_type
-        self.response = response
-        self.intent = intent
-        self.confidence = confidence
+    customer_id: int
+    message: str
+    agent_type: str
+    response: str
+    intent: str
+    confidence: float
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
-class ConversationContext:
+
+class ConversationContext(BaseModel):
     """Maintains conversation state and history."""
 
-    def __init__(self, customer_id: int, conversation_id: int):
-        self.customer_id = customer_id
-        self.conversation_id = conversation_id
-        self.messages: List[ConversationMessage] = []
-        self.created_at = datetime.utcnow()
-        self.last_intent = None
-        self.escalation_id = None
-        self.is_escalated = False
+    customer_id: int
+    conversation_id: int
+    messages: List[ConversationMessage] = []
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_intent: Optional[str] = None
+    escalation_id: Optional[str] = None
+    is_escalated: bool = False
 
     def add_message(
         self,
