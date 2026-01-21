@@ -2,8 +2,6 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
-
-
 class AgentResponse(BaseModel):
     """Standard output for all agents."""
     content: str
@@ -20,6 +18,9 @@ class WorkflowState(BaseModel):
     message: str
     customer_id: int
     conversation_id: int = 0
+    # [NEW] Conversation History (List of {"role": "user"|"assistant", "content": "..."})
+    history: List[Dict[str, str]] = Field(default_factory=list)
+
     context: Dict[str, Any] = Field(default_factory=dict, exclude=True)
 
     # Flow State

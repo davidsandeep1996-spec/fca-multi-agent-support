@@ -63,6 +63,23 @@ class ConversationContext(BaseModel):
         )
         self.messages.append(conv_msg)
         self.last_intent = intent
+        
+    def get_llm_history(self, limit_turns: int = 5) -> List[Dict[str, str]]:
+        """
+        Get history formatted for LLM context (Sliding Window).
+        Returns list of {'role': 'user'|'assistant', 'content': ...}
+        """
+        history = []
+        # Get last N turns
+        recent_msgs = self.messages[-limit_turns:]
+
+        for msg in recent_msgs:
+            # Add User Message
+            history.append({"role": "user", "content": msg.message})
+            # Add Agent Response
+            history.append({"role": "assistant", "content": msg.response})
+
+        return history
 
     def mark_escalated(self, escalation_id: str) -> None:
         """Mark conversation as escalated."""
@@ -139,6 +156,8 @@ class AgentCoordinator:
 
         conv_context = self.get_or_create_conversation(customer_id, conversation_id)
 
+        history = conv_context.get_llm_history(limit_turns=5)
+
         if context is None:
             context = {}
 
@@ -178,6 +197,7 @@ class AgentCoordinator:
                 customer_id=customer_id,
                 conversation_id=conversation_id,
                 context=context,
+                history=history,
             )
 
         # everything below stays the same (uses workflow_response)

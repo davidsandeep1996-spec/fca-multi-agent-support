@@ -117,14 +117,13 @@ class MessageWorkflow:
         """Classify intent."""
         self.logger.info("📋 Classifying message intent...")
 
-        # 1. READ from State (using dot notation)
-        message = state.message
+
         # customer_id = state.customer_id (not needed for classification logic, but available)
 
         # 2. PROCESS
         classification = await self.intent_classifier.process({
-            "message": message,
-        })
+            "message": state.message,
+        },context={"conversation_history": state.history})
 
         intent = classification.metadata.get("intent", "general_inquiry")
         confidence = classification.confidence
@@ -150,7 +149,7 @@ class MessageWorkflow:
         response = await self.account_agent.process({
             "customer_id": customer_id,
             "message": message,
-        })
+        },context={"conversation_history": state.history})
 
         self.logger.info(f"✅ Account query handled: {response.metadata.get('query_type')}")
 
@@ -171,7 +170,7 @@ class MessageWorkflow:
         # 2. PROCESS
         response = await self.general_agent.process({
             "message": message,
-        })
+        },context={"conversation_history": state.history})
 
         self.logger.info(f"✅ General inquiry handled: {response.metadata.get('source')}")
 
@@ -195,7 +194,7 @@ class MessageWorkflow:
         response = await self.product_agent.process({
             "customer_id": customer_id,
             "message": message,
-        })
+        },context={"conversation_history": state.history})
 
         self.logger.info(f"✅ Product recommendation generated")
 
@@ -319,6 +318,7 @@ class MessageWorkflow:
         customer_id: int,
         conversation_id: int = 0,
         context: Optional[Dict[str, Any]] = None,
+        history: List[Dict[str, str]] = None
     ) -> Dict[str, Any]:
         """
         Process message through workflow.
@@ -341,6 +341,7 @@ class MessageWorkflow:
             "customer_id": customer_id,
             "conversation_id": conversation_id,
             "context": context or {},
+            "history": history or []
         }
 
         # Run workflow

@@ -210,33 +210,29 @@ class IntentClassifierAgent(BaseAgent):
 
         return result
 
-    def _build_classification_prompt(
-        self,
-        message: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> str:
-        """
-        Build prompt for classification.
-
-        Args:
-            message: Customer message
-            context: Optional context
-
-        Returns:
-            str: Formatted prompt
-        """
+    def _build_classification_prompt(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
         # Intent descriptions
         intent_descriptions = "\n".join([
             f"- {intent}: {data['description']}"
             for intent, data in self.INTENTS.items()
         ])
 
-        # Build prompt
-        prompt = f"""Classify the following customer message into one of these intents:
+        prompt = f"""Classify the customer message into one of these intents:
 
 {intent_descriptions}
 
-Customer Message: "{message}"
+"""
+        # [NEW] Inject History
+        if context and "conversation_history" in context:
+            history_list = context["conversation_history"]
+            if history_list:
+                history_str = "\n".join([
+                    f"{msg['role'].upper()}: {msg['content']}"
+                    for msg in history_list
+                ])
+                prompt += f"PREVIOUS CONVERSATION:\n{history_str}\n\n"
+
+        prompt += f"""CURRENT CUSTOMER MESSAGE: "{message}"
 
 Respond in this exact format:
 INTENT: <intent_name>
@@ -244,17 +240,7 @@ CONFIDENCE: <0.0-1.0>
 SENTIMENT: <positive|neutral|negative>
 EXPLANATION: <brief explanation>
 """
-
-        # Add context if provided
-        if context and context.get("conversation_history"):
-            history = "\n".join([
-                f"{msg['role']}: {msg['content']}"
-                for msg in context["conversation_history"][-3:]  # Last 3 messages
-            ])
-            prompt += f"\n\nConversation History:\n{history}"
-
         return prompt
-
     def _get_system_prompt(self) -> str:
         """
         Get system prompt for LLM.
