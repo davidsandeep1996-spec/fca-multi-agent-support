@@ -6,11 +6,12 @@ Provides common functionality and interface.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Callable
 from datetime import datetime
 import logging
 from app.schemas.common import AgentResponse
 from app.config import settings
+
 
 
 class AgentConfig:
@@ -77,6 +78,7 @@ class BaseAgent(ABC):
         self.name = name
         self.config = config or AgentConfig()
         self.logger = logging.getLogger(f"agent.{name}")
+        self.tools = []
         self.services = services or {}
 
         # Agent metadata
@@ -85,6 +87,8 @@ class BaseAgent(ABC):
 
         # Initialize agent
         self._initialize()
+
+
 
     # ========================================================================
     # ABSTRACT METHODS (must be implemented by subclasses)

@@ -11,6 +11,10 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 import logging
 
+from fastapi.responses import StreamingResponse
+import json
+from app.coordinator.agent_coordinator import AgentCoordinator
+
 # Import configuration and utilities
 from app.config import settings
 from app.logger import setup_logging
@@ -25,6 +29,9 @@ from app.routers import health
 # Setup logging
 setup_logging()
 logger = logging.getLogger(__name__)
+
+
+coordinator = AgentCoordinator()
 
 
 
@@ -173,6 +180,28 @@ def create_application() -> FastAPI:
             "environment": settings.environment,
             "docs": "/docs" if settings.debug else "disabled",
         }
+
+    @app.get("/chat/stream", tags=["Chat"])
+    async def chat_stream(message: str, customer_id: int, conversation_id: int):
+        """
+        Stream chat response using Server-Sent Events (SSE).
+        """
+        async def event_generator():
+            try:
+                # Iterate over the coordinator's generator
+                async for event in coordinator.stream_message(message, customer_id, conversation_id):
+                    # Format as SSE data
+                    yield f"data: {json.dumps(event)}\n\n"
+
+                # Signal end of stream
+                yield "event: done\ndata: [DONE]\n\n"
+
+            except Exception as e:
+                logger.error(f"Stream error: {e}", exc_info=True)
+                error_data = json.dumps({"error": str(e)})
+                yield f"event: error\ndata: {error_data}\n\n"
+
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
 
     # Register routers
     app.include_router(

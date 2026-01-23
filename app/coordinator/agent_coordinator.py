@@ -63,7 +63,7 @@ class ConversationContext(BaseModel):
         )
         self.messages.append(conv_msg)
         self.last_intent = intent
-        
+
     def get_llm_history(self, limit_turns: int = 5) -> List[Dict[str, str]]:
         """
         Get history formatted for LLM context (Sliding Window).
@@ -347,3 +347,110 @@ class AgentCoordinator:
                 "Statistics & monitoring",
             ],
         }
+
+    async def stream_message(self, message: str, customer_id: int, conversation_id: int, context=None):
+        """
+        Stream conversation updates (Server-Sent Events).
+        Yields: Dicts with 'type', 'step', and 'content'.
+        """
+        conv_context = self.get_or_create_conversation(customer_id, conversation_id)
+
+        if context is None: context = {}
+
+        # 1. Manage DB Session manually for the generator
+        async with AsyncSessionLocal() as session:
+            # Initialize Services
+            account_svc = AccountService(db=session)
+            customer_svc = CustomerService(db=session)
+            transaction_svc = TransactionService(db=session)
+            product_svc = ProductService(db=session)
+            conversation_svc = ConversationService(db=session)
+            faq_svc = FAQService(db=session)
+
+            # Build Workflow
+            workflow = MessageWorkflow(
+                account_service=account_svc,
+                customer_service=customer_svc,
+                transaction_service=transaction_svc,
+                product_service=product_svc,
+                conversation_service=conversation_svc,
+                faq_service=faq_svc
+            )
+
+            # Update Context
+            context.update({
+                "account_service": account_svc,
+                "customer_service": customer_svc,
+                "transaction_service": transaction_svc,
+                "product_service": product_svc,
+                "conversation_service": conversation_svc,
+            })
+
+            # Track final state for persistence
+            final_response_text = ""
+            final_agent = "unknown"
+            final_intent = "unknown"
+            final_confidence = 0.0
+            escalation_id = None
+
+            # 2. Stream Loop
+            async for node_name, state_update in workflow.process_message_stream(
+                message, customer_id, conversation_id, context
+            ):
+                # --- EVENT: Intent Classified ---
+                if node_name == "classify":
+                    final_intent = state_update.get("intent")
+                    yield {
+                        "type": "status",
+                        "step": "intent",
+                        "content": f"Identified intent: {final_intent}"
+                    }
+
+                # --- EVENT: Agent Working ---
+                elif node_name in ["account", "general", "product", "human"]:
+                    final_agent = node_name
+                    # Send a "thinking" update
+                    yield {
+                        "type": "status",
+                        "step": "processing",
+                        "content": f"{node_name.capitalize()} Agent is processing..."
+                    }
+
+                # --- EVENT: Compliance Check ---
+                elif node_name == "compliance":
+                     yield {
+                        "type": "status",
+                        "step": "compliance",
+                        "content": "Verifying FCA compliance..."
+                    }
+
+                # --- EVENT: Final Response ---
+                elif node_name == "end":
+                    final_data = state_update.get("final_response", {})
+                    final_response_text = final_data.get("message")
+                    final_agent = final_data.get("agent")
+                    final_intent = final_data.get("intent")
+                    final_confidence = final_data.get("confidence")
+                    escalation_id = final_data.get("metadata", {}).get("escalation_id")
+
+                    yield {
+                        "type": "response",
+                        "content": final_response_text,
+                        "metadata": final_data.get("metadata"),
+                        "conversation_id": conversation_id
+                    }
+
+            # 3. Persistence (Save to Memory & DB)
+            # This ensures history is saved even when streaming
+            conv_context.add_message(
+                message=message,
+                agent_type=final_agent,
+                response=final_response_text,
+                intent=final_intent,
+                confidence=final_confidence,
+            )
+
+            if escalation_id:
+                conv_context.mark_escalated(escalation_id)
+
+            self.logger.info(f"✅ Stream complete: {final_agent} agent")

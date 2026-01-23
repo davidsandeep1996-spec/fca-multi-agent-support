@@ -189,11 +189,13 @@ class MessageWorkflow:
         # 1. READ from State
         message = state.message
         customer_id = state.customer_id
+        intent = state.intent
 
         # 2. PROCESS
         response = await self.product_agent.process({
             "customer_id": customer_id,
             "message": message,
+            "intent": intent,
         },context={"conversation_history": state.history})
 
         self.logger.info(f"✅ Product recommendation generated")
@@ -378,3 +380,25 @@ class MessageWorkflow:
                 "complaint",
             ],
         }
+
+    async def process_message_stream(
+        self,
+        message: str,
+        customer_id: int,
+        conversation_id: int = 0,
+        context: Optional[Dict[str, Any]] = None,
+    ):
+        """
+        Stream workflow execution (Yields partial updates node-by-node).
+        """
+        initial_state = {
+            "message": message,
+            "customer_id": customer_id,
+            "conversation_id": conversation_id,
+            "context": context or {},
+        }
+
+        # Use LangGraph's astream to get state updates after each node finishes
+        async for event in self.workflow.astream(initial_state):
+            for node_name, state_update in event.items():
+                yield node_name, state_update
