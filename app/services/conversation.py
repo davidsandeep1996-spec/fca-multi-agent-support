@@ -26,8 +26,10 @@ class ConversationService(BaseService):
 # 👇 THIS WAS LIKELY MISSING OR BROKEN 👇
         if self.db:
             self.repo = ConversationRepository(self.db)
+            self.customer_repo = CustomerRepository(self.db)
         else:
             self.repo = None
+            self.customer_repo = None
 
     async def __aenter__(self):
         """Enter async context."""

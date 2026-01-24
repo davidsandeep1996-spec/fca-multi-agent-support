@@ -52,7 +52,11 @@ class AccountAgent(BaseAgent):
                 raise ValueError("customer_id is required")
 
             query_type = self._determine_query_type(message)
-            result = await self._fetch_real_data(customer_id, query_type, message)
+
+            async with self.customer_service as cust_svc:
+                async with self.account_service as acct_svc:
+                    async with self.transaction_service as txn_svc:
+                        result = await self._fetch_real_data(cust_svc, acct_svc, txn_svc, customer_id, query_type, message)
             response = self.create_response(
                 content=result["response"],
                 metadata={
@@ -86,13 +90,13 @@ class AccountAgent(BaseAgent):
         else:
             return "general"
 
-    async def _fetch_real_data(self, customer_id: int, query_type: str, message: str) -> Dict[str, Any]:
+    async def _fetch_real_data(self, cust_svc, acct_svc, txn_svc, customer_id: int, query_type: str, message: str) -> Dict[str, Any]:
         """
         Fetch real data from database services.
         """
         try:
             # 1) Customer lookup uses INTERNAL PK (customers.id: int)
-            customer = await self.customer_service.get_customer(customer_id)
+            customer = await cust_svc.get_customer(customer_id)
             if not customer:
                 return {"response": f"Customer {customer_id} not found", "data": {}, "data_points": []}
 
@@ -116,7 +120,7 @@ class AccountAgent(BaseAgent):
                 }
 
             if query_type == "balance":
-                accounts = await self.account_service.get_accounts_by_customer(external_customer_id)
+                accounts = await acct_svc.get_accounts_by_customer(external_customer_id)
                 if not accounts:
                     response = (
                         "Your current account balance is 0.00.\n\n"
@@ -149,7 +153,7 @@ class AccountAgent(BaseAgent):
                 }
 
             elif query_type == "transactions":
-                accounts = await self.account_service.get_accounts_by_customer(external_customer_id)
+                accounts = await acct_svc.get_accounts_by_customer(external_customer_id)
                 if not accounts:
                     return {"response": f"No accounts found for customer {customer_id}", "data": {}, "data_points": []}
 
@@ -159,7 +163,7 @@ class AccountAgent(BaseAgent):
                     return {"response": "Account record missing id", "data": {}, "data_points": []}
 
                 # Note: this service actually expects account_id (despite method name) in your codebase
-                transactions = await self.transaction_service.get_transactions_by_account(account_id, limit=10)
+                transactions = await txn_svc.get_transactions_by_account(account_id, limit=10)
 
                 response = "Your recent transactions (last 10):\n\n"
                 for i, txn in enumerate(transactions, 1):
@@ -187,7 +191,7 @@ class AccountAgent(BaseAgent):
                 }
 
             elif query_type == "statement":
-                accounts = await self.account_service.get_accounts_by_customer(external_customer_id)
+                accounts = await acct_svc.get_accounts_by_customer(external_customer_id)
                 acct = accounts[0] if accounts else None
                 account_number = getattr(acct, "account_number", None) if acct else None
 
@@ -210,7 +214,7 @@ class AccountAgent(BaseAgent):
                 }
 
             elif query_type == "details":
-                accounts = await self.account_service.get_accounts_by_customer(external_customer_id)
+                accounts = await acct_svc.get_accounts_by_customer(external_customer_id)
                 if not accounts:
                     return {"response": f"No accounts found for customer {customer_id}", "data": {}, "data_points": []}
 
@@ -245,7 +249,7 @@ class AccountAgent(BaseAgent):
                 }
 
             else:
-                accounts = await self.account_service.get_accounts_by_customer(external_customer_id)
+                accounts = await acct_svc.get_accounts_by_customer(external_customer_id)
                 response = f"Account information for customer {customer_id}. How else can I help with your account?"
                 return {
                     "response": response,

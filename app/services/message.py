@@ -23,8 +23,13 @@ class MessageService(BaseService):
     def __init__(self, db: AsyncSession = None):
         """Initialize message service."""
         super().__init__(db)
-        self.repo = None
-        self.conversation_repo = None
+        # Initialize repos immediately if DB is provided
+        if self.db:
+            self.repo = MessageRepository(self.db)
+            self.conversation_repo = ConversationRepository(self.db)
+        else:
+            self.repo = None
+            self.conversation_repo = None
 
     async def __aenter__(self):
         """Enter async context."""
@@ -61,6 +66,11 @@ class MessageService(BaseService):
         Raises:
             ValueError: If conversation not found
         """
+        # [SAFETY CHECK] Ensure repo is initialized
+        if not self.conversation_repo or not self.repo:
+            raise RuntimeError("Service not initialized. Use 'async with' or provide db session.")
+
+
         # Verify conversation exists
         conversation = await self.conversation_repo.get_by_id(conversation_id)
         if not conversation:

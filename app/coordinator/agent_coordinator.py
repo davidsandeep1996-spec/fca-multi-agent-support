@@ -19,7 +19,10 @@ from app.services import (
             ConversationService,
             TransactionService,
             FAQService,
+            MessageService
         )
+from app.models.message import MessageRole
+
 class ConversationMessage(BaseModel):
     """Single message in conversation."""
 
@@ -161,34 +164,61 @@ class AgentCoordinator:
         if context is None:
             context = {}
 
+
+        # Ensure Conversation Exists in DB before saving messages
         async with AsyncSessionLocal() as session:
-            account_service = AccountService(db=session)
-            customer_service = CustomerService(db=session)
-            transaction_service = TransactionService(db=session)
-            product_service = ProductService(db=session)
-            conversation_service = ConversationService(db=session)
-            # IMPORTANT: initialize faq_service with db session
-            faq_service = FAQService(db=session)
+            conv_svc = ConversationService(db=session)
+            existing_conv = await conv_svc.get_conversation(conversation_id)
+            if not existing_conv:
+                self.logger.info(f"🆕 Creating new conversation {conversation_id} in DB")
+                # Auto-create if missing (e.g., first message in new chat)
+                # Note: We assume customer_id exists. If not, this might fail,
+                # but usually customer is validated upstream (Auth).
+                try:
+                    new_conv = await conv_svc.start_conversation(
+                        customer_id=customer_id,
+                        title="New Conversation",
+                        channel="web" # or ConversationChannel.WEB
+                    )
+                    conversation_id = new_conv.id
+                    self.logger.info(f"✅ Created conversation {conversation_id} for customer {customer_id}")
+                except Exception as e:
+                    self.logger.warning(f"Could not auto-create conversation: {e}")
+
+        # [FIX] 1. Save User Message (Separate Session)
+        async with AsyncSessionLocal() as session:
+            msg_svc = MessageService(db=session)
+            try:
+                await msg_svc.add_message(
+                    conversation_id=conversation_id,
+                    role=MessageRole.CUSTOMER,
+                    content=message,
+                    intent=None
+                )
+            except Exception as e:
+                self.logger.error(f"Failed to save user message: {e}")
+
+
 
             # build workflow WITH db-backed services
             workflow = MessageWorkflow(
-                account_service=account_service,
-                customer_service=customer_service,
-                transaction_service=transaction_service,
-                product_service=product_service,
-                conversation_service=conversation_service,
-                faq_service=faq_service
+                account_service=AccountService(),
+                customer_service=CustomerService(),
+                transaction_service=TransactionService(),
+                product_service=ProductService(),
+                conversation_service=ConversationService(),
+                faq_service=FAQService()
             )
 
             # IMPORTANT: update context with the db-backed services (not self.*)
             context.update({
-                "account_service": account_service,
-                "customer_service": customer_service,
-                "transaction_service": transaction_service,
-                "product_service": product_service,
+                "account_service": AccountService(),
+                "customer_service": CustomerService(),
+                "transaction_service": TransactionService(),
+                "product_service": ProductService(),
                 # keep these only if they exist and are DB-safe in your project:
                 # "compliance_service": ...,
-                "conversation_service": conversation_service,
+                "conversation_service": ConversationService(),
             })
 
             # IMPORTANT: call the local workflow, not self.workflow
@@ -205,6 +235,21 @@ class AgentCoordinator:
         response_text = workflow_response.get("message")
         intent = workflow_response.get("intent")
         confidence = workflow_response.get("confidence", 0.0)
+
+        # 2. Save Agent Response to DB
+        async with AsyncSessionLocal() as session:
+            msg_svc = MessageService(db=session)
+            try:
+                await msg_svc.add_message(
+                    conversation_id=conversation_id,
+                    role=MessageRole.AGENT,
+                    content=response_text,
+                    agent_name=agent_type,
+                    intent=intent,
+                    confidence_score=int(confidence * 100) if confidence else 0
+                )
+            except Exception as e:
+                self.logger.error(f"Failed to save agent message: {e}")
 
         conv_context.add_message(
             message=message,
@@ -454,3 +499,55 @@ class AgentCoordinator:
                 conv_context.mark_escalated(escalation_id)
 
             self.logger.info(f"✅ Stream complete: {final_agent} agent")
+
+
+    async def get_db_conversation_history(self, conversation_id: int, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Fetch conversation history from the Database.
+        """
+        async with AsyncSessionLocal() as session:
+            msg_service = MessageService(db=session)
+            self.logger.info(f"🔍 Querying DB for History of Conversation {conversation_id}")
+
+            messages = await msg_service.get_conversation_messages(conversation_id, page_size=limit)
+
+            self.logger.info(f"🔍 DB Returned {len(messages)} messages for ID {conversation_id}")
+
+            # Convert SQLAlchemy models to clean dicts
+            history = []
+            for msg in messages:
+                # Handle potential Enum or String for role
+                role_str = msg.role.value if hasattr(msg.role, 'value') else str(msg.role)
+
+                history.append({
+                    "id": msg.id,
+                    "role": role_str,
+                    "content": msg.content,
+                    "agent_name": msg.agent_name,
+                    "intent": msg.intent,
+                    "timestamp": msg.created_at.isoformat() if msg.created_at else None
+                })
+
+            # Sort by ID or Timestamp (Ascending = Chronological)
+            history.sort(key=lambda x: x["timestamp"] or "")
+            return history
+
+    async def get_db_customer_conversations(self, customer_id: int) -> List[Dict[str, Any]]:
+        """
+        Fetch all conversations for a customer from Database.
+        """
+        async with AsyncSessionLocal() as session:
+            conv_service = ConversationService(db=session)
+            conversations = await conv_service.get_customer_conversations(customer_id)
+
+            return [
+                {
+                    "conversation_id": c.id,
+                    "title": c.title,
+                    "status": c.status.value if hasattr(c.status, 'value') else str(c.status),
+                    "created_at": c.created_at.isoformat(),
+                    "message_count": c.message_count,
+                    "last_updated": c.updated_at.isoformat()
+                }
+                for c in conversations
+            ]

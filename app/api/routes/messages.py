@@ -21,6 +21,17 @@ logger = logging.getLogger(__name__)
 # REQUEST/RESPONSE MODELS
 # ============================================================================
 
+#  Update Pydantic Models for Chat History
+class ChatMessageItem(BaseModel):
+    """Single message in history."""
+    id: Optional[int] = None
+    role: str
+    content: str
+    timestamp: str
+    agent_name: Optional[str] = None
+    intent: Optional[str] = None
+
+
 class MessageRequest(BaseModel):
     """Incoming message request."""
     message: str
@@ -57,7 +68,7 @@ class ConversationHistoryItem(BaseModel):
 class ConversationHistory(BaseModel):
     """Conversation history response."""
     conversation_id: int
-    history: list[ConversationHistoryItem]
+    history: list[ChatMessageItem]
 
 
 class ConversationStats(BaseModel):
@@ -112,6 +123,7 @@ async def process_message(request: MessageRequest) -> MessageResponse:
                 "turn_count": response["turn_count"],
                 "escalated": response["escalated"],
                 "escalation_id": response.get("escalation_id"),
+                "conversation_id": response.get("conversation_id"),
             }
         )
 
@@ -127,23 +139,22 @@ async def process_message(request: MessageRequest) -> MessageResponse:
 # CONVERSATION ENDPOINTS
 # ============================================================================
 
+#  Update History Endpoint to use DB
 @router.get("/conversations/{conversation_id}/history", response_model=ConversationHistory)
 async def get_conversation_history(
     conversation_id: int,
-    limit: int = 10,
+    limit: int = 50,
 ) -> ConversationHistory:
     """
-    Get conversation history.
-
-    Args:
-        conversation_id: ID of conversation
-        limit: Max messages to return
-
-    Returns:
-        ConversationHistory with message turns
+    Get conversation history (DB Backed).
     """
     try:
-        history = coordinator.get_conversation_history(conversation_id, limit)
+        # Call the new Async DB method
+        if hasattr(coordinator, "get_db_conversation_history"):
+            history = await coordinator.get_db_conversation_history(conversation_id, limit)
+        else:
+            # Fallback if you renamed it in the class
+            history = await coordinator.get_conversation_history(conversation_id, limit)
 
         if history is None:
             raise HTTPException(status_code=404, detail="Conversation not found")
@@ -153,46 +164,28 @@ async def get_conversation_history(
             history=history,
         )
 
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"History retrieval error: {e}")
         raise HTTPException(status_code=500, detail="Error retrieving history")
 
-
+#  Update Customer Conversations Endpoint to use DB
 @router.get("/customers/{customer_id}/conversations")
 async def get_customer_conversations(customer_id: int) -> Dict[str, Any]:
     """
-    Get all conversations for a customer.
-
-    Args:
-        customer_id: Customer ID
-
-    Returns:
-        List of conversations with metadata
+    Get all conversations for a customer (DB Backed).
     """
     try:
-        conversations = coordinator.get_all_conversations(customer_id)
+        # Call the new Async DB method
+        conversations = await coordinator.get_db_customer_conversations(customer_id)
 
         return {
             "customer_id": customer_id,
-            "conversations": [
-                {
-                    "conversation_id": conv.conversation_id,
-                    "message_count": len(conv.messages),
-                    "created_at": conv.created_at.isoformat(),
-                    "is_escalated": conv.is_escalated,
-                    "escalation_id": conv.escalation_id,
-                    "last_intent": conv.last_intent,
-                }
-                for conv in conversations
-            ]
+            "conversations": conversations
         }
 
     except Exception as e:
         logger.error(f"Error retrieving conversations: {e}")
         raise HTTPException(status_code=500, detail="Error retrieving conversations")
-
 
 # ============================================================================
 # ESCALATION ENDPOINTS

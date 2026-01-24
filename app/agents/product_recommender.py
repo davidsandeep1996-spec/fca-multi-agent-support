@@ -12,9 +12,7 @@ class ProductRecommenderAgent(BaseAgent):
         super().__init__(name="product_recommender", config=config)
         self.client = AsyncGroq(api_key=self.config.api_key)
 
-        # Enforce DB Service Injection
-        if product_service is None:
-            raise ValueError("ProductRecommenderAgent requires ProductService injected with a DB session")
+
         self.product_service = product_service
 
     async def process(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentResponse:
@@ -26,7 +24,9 @@ class ProductRecommenderAgent(BaseAgent):
         customer_profile = context.get("customer", {}) if context else {}
 
         try:
-            recommendations = await self._generate_recommendations(intent, message, customer_profile)
+            async with self.product_service as service:
+
+                recommendations = await self._generate_recommendations(service,intent, message, customer_profile)
 
             response = self.create_response(
                 content=recommendations["response_text"],
@@ -47,12 +47,12 @@ class ProductRecommenderAgent(BaseAgent):
                 confidence=0.0
             )
 
-    async def _generate_recommendations(self, intent: str, message: str, customer_profile: Dict[str, Any]) -> Dict[str, Any]:
+    async def _generate_recommendations(self, service: ProductService, intent: str, message: str, customer_profile: Dict[str, Any]) -> Dict[str, Any]:
         # 1. Map intent to DB type (loan, credit, savings, current)
         category = self._determine_category(intent)
 
         # 2. Fetch from DB
-        available_products = await self.product_service.get_products_by_category(category)
+        available_products = await service.get_products_by_category(category)
 
         if not available_products:
              return {
@@ -173,4 +173,3 @@ CONFIDENCE: <0.0-1.0>
 
     def _get_capabilities(self) -> List[str]:
         return ["Product recommendation", "Needs analysis"]
-    

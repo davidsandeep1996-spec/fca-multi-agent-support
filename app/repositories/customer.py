@@ -23,6 +23,7 @@ class CustomerRepository(BaseRepository[Customer]):
     def __init__(self, db: AsyncSession):
         """Initialize customer repository."""
         super().__init__(Customer, db)
+        
 
     async def get_by_email(self, email: str) -> Optional[Customer]:
         """
