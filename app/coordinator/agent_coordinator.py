@@ -206,12 +206,12 @@ class AgentCoordinator:
 
             # build workflow WITH db-backed services
             workflow = MessageWorkflow(
-                account_service=AccountService(),
-                customer_service=CustomerService(),
-                transaction_service=TransactionService(),
-                product_service=ProductService(),
-                conversation_service=ConversationService(),
-                faq_service=FAQService(),
+                account_service=AccountService(db=session),
+                customer_service=CustomerService(db=session),
+                transaction_service=TransactionService(db=session),
+                product_service=ProductService(db=session),
+                conversation_service=ConversationService(db=session),
+                faq_service=FAQService(db=session),
                 checkpointer=self.checkpointer
             )
 
