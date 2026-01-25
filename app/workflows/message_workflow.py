@@ -4,7 +4,7 @@ Message Workflow
 Multi-agent orchestration using LangGraph.
 Routes messages through Intent Classifier → Specialized Agents.
 """
-
+from langgraph.checkpoint.memory import MemorySaver
 from typing import Dict, Any, Optional, List
 from enum import Enum
 from pydantic import BaseModel, Field, ConfigDict
@@ -45,7 +45,7 @@ class MessageWorkflow:
     3. Response formatting
     """
 
-    def __init__(self, *, account_service, customer_service, transaction_service, product_service, conversation_service, faq_service):
+    def __init__(self, *, account_service, customer_service, transaction_service, product_service, conversation_service, faq_service, checkpointer=None):
         self.intent_classifier = IntentClassifierAgent()
         self.account_agent = AccountAgent(
             account_service=account_service,
@@ -59,10 +59,12 @@ class MessageWorkflow:
         self.human_agent = HumanAgent(conversation_service=conversation_service)
         self.logger = logging.getLogger(__name__)
 
+        # Initialize memory saver
+        self.checkpointer = checkpointer
 
         # Build LangGraph workflow
         self.graph = self._build_graph()
-        self.workflow = self.graph.compile()
+        self.workflow = self.graph.compile(checkpointer=self.checkpointer, interrupt_before=["human_approval"])
 
     def _build_graph(self):
         """Build LangGraph state machine."""
@@ -78,6 +80,8 @@ class MessageWorkflow:
         workflow.add_node("compliance", self._node_compliance)
         workflow.add_node("human", self._node_human)
         workflow.add_node("end", self._node_end)
+        workflow.add_node("human_approval", self._node_human_approval)
+
 
         # Entry point
         workflow.set_entry_point("classify")
@@ -101,8 +105,19 @@ class MessageWorkflow:
         # All paths eventually end
         workflow.add_edge("account", "end")
         workflow.add_edge("general", "end")
-        workflow.add_edge("compliance", "end")
         workflow.add_edge("human", "end")
+
+        workflow.add_conditional_edges(
+            "compliance",
+            self._route_compliance, # New router
+            {
+                "approved": "end",
+                "review": "human_approval"
+            }
+        )
+
+        workflow.add_edge("human_approval", "end")
+
 
         # End state
         workflow.set_finish_point("end")
@@ -112,6 +127,8 @@ class MessageWorkflow:
     # ========================================================================
     # NODE IMPLEMENTATIONS
     # ========================================================================
+
+
 
     async def _node_classify(self, state: WorkflowState) -> Dict[str, Any]:
         """Classify intent."""
@@ -292,6 +309,16 @@ class MessageWorkflow:
         # 3. RETURN UPDATES
         return {"final_response": final_response}
 
+
+    async def _node_human_approval(self, state: WorkflowState) -> Dict[str, Any]:
+        """
+        Node that represents the 'Human Review' step.
+        Since we set interrupt_before=['human_approval'], execution pauses HERE.
+        When resumed, it executes this and moves to END.
+        """
+        self.logger.info("👤 Manual approval processed.")
+        return {}
+
     # ========================================================================
     # ROUTING LOGIC
     # ========================================================================
@@ -309,6 +336,12 @@ class MessageWorkflow:
         }
 
         return intent_map.get(intent, "general")
+
+    def _route_compliance(self, state: WorkflowState) -> str:
+        """Route based on compliance status."""
+        if state.is_compliant:
+            return "approved"
+        return "review"
 
     # ========================================================================
     # PUBLIC INTERFACE
@@ -337,6 +370,9 @@ class MessageWorkflow:
         self.logger.info(f"\n🔄 Processing message from customer {customer_id}")
         self.logger.info(f"Message: {message[:100]}...")
 
+        # Config for persistence
+        config = {"configurable": {"thread_id": str(conversation_id)}}
+
         # Initial state
         initial_state = {
             "message": message,
@@ -347,7 +383,24 @@ class MessageWorkflow:
         }
 
         # Run workflow
-        final_state = await self.workflow.ainvoke(initial_state)
+        final_state = await self.workflow.ainvoke(initial_state, config=config)
+
+        snapshot = self.workflow.get_state(config)
+        if snapshot.next:
+            # We are paused
+            self.logger.info("⏸️ Workflow paused for Human Review")
+            # Return a special response indicating pause
+            return {
+                "message": "This request requires human approval due to compliance checks. An agent will review it shortly.",
+                "response": "This request requires human approval due to compliance checks. An agent will review it shortly.",
+                "agent": "system",
+                "intent": final_state.get("intent"),
+                "confidence": final_state.get("confidence"),
+                "status": "paused", # Signal to coordinator
+                "metadata": {
+                    "escalation_id": "PENDING_REVIEW"
+                }
+            }
 
         return final_state.get("final_response")
 

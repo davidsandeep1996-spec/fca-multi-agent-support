@@ -5,9 +5,10 @@ Protected endpoints for administrative tasks including database seeding.
 """
 
 import logging
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel
-
+from typing import  Dict, Any, List
+from app.api.routes.messages import coordinator
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
@@ -26,6 +27,14 @@ class SeedResponse(BaseModel):
     """Response from seeding."""
     status: str
     message: str
+
+# Add Model for Intervention/Approval
+class InterventionRequest(BaseModel):
+    """
+    Request to approve/modify a paused agent action.
+    """
+    conversation_id: int
+    approved_response: str
 
 
 # ============================================================================
@@ -91,4 +100,47 @@ async def health_check():
     return {
         "status": "healthy",
         "message": "Admin API is operational"
+    }
+
+#  Add Endpoint to Approve & Resume
+@router.post("/interventions/approve")
+async def approve_intervention(request: InterventionRequest):
+    """
+    Approve a paused conversation.
+
+    1. Updates the state with the 'approved_response'.
+    2. Sets 'is_compliant' to True.
+    3. Resumes the LangGraph workflow from the paused node.
+    """
+    try:
+        # Call the coordinator method we added in the previous step
+        result = await coordinator.approve_intervention(
+            conversation_id=request.conversation_id,
+            new_response=request.approved_response
+        )
+
+        return {
+            "status": "resumed",
+            "message": "Workflow resumed successfully",
+            "final_response": result
+        }
+    except Exception as e:
+        logger.error(f"Failed to approve intervention: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# [CHANGE 1d] Add Endpoint to List Pending (Mock/Placeholder)
+@router.get("/interventions/pending")
+async def get_pending_interventions():
+    """
+    Get list of conversations currently paused for human review.
+
+    (Note: With MemorySaver, we cannot easily query 'all paused threads'
+    without maintaining a separate index in DB. For MVP, we return a
+    static message or you could implement a DB query for 'paused' status.)
+    """
+    # In a real production app using PostgresSaver, you would query the checkpoints table.
+    return {
+        "message": "To view pending interventions, check conversations with status='paused' in the database.",
+        "count": "Unknown (Requires DB persistence layer for checkpoints)"
     }

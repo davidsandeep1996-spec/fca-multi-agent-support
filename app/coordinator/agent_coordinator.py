@@ -10,6 +10,8 @@ from datetime import datetime
 import logging
 from pydantic import BaseModel, Field
 
+from langgraph.checkpoint.memory import MemorySaver
+
 from app.workflows.message_workflow import MessageWorkflow
 from app.database import AsyncSessionLocal
 from app.services import (
@@ -135,6 +137,8 @@ class AgentCoordinator:
         self.transaction_service = TransactionService()
         self.faq_service = FAQService()
 
+        self.checkpointer = MemorySaver()
+
     # ========================================================================
     # CONVERSATION MANAGEMENT
     # ========================================================================
@@ -207,19 +211,20 @@ class AgentCoordinator:
                 transaction_service=TransactionService(),
                 product_service=ProductService(),
                 conversation_service=ConversationService(),
-                faq_service=FAQService()
+                faq_service=FAQService(),
+                checkpointer=self.checkpointer
             )
 
             # IMPORTANT: update context with the db-backed services (not self.*)
-            context.update({
-                "account_service": AccountService(),
-                "customer_service": CustomerService(),
-                "transaction_service": TransactionService(),
-                "product_service": ProductService(),
+            #context.update({
+             #   "account_service": AccountService(),
+              #  "customer_service": CustomerService(),
+               # "transaction_service": TransactionService(),
+                #"product_service": ProductService(),
                 # keep these only if they exist and are DB-safe in your project:
                 # "compliance_service": ...,
-                "conversation_service": ConversationService(),
-            })
+               # "conversation_service": ConversationService(),
+           #})
 
             # IMPORTANT: call the local workflow, not self.workflow
             workflow_response = await workflow.process_message(
@@ -230,9 +235,19 @@ class AgentCoordinator:
                 history=history,
             )
 
+        #  Handle Paused State
+        if workflow_response.get("status") == "paused":
+            # We can save a placeholder message or just notify
+            self.logger.info(f"🛑 Conversation {conversation_id} is PAUSED for review.")
+            # We might want to mark the conversation as 'review_pending' in DB here
+
+            # Proceed to save the "Hold on" message to DB so user sees it
+            response_text = workflow_response.get("response")
+            # ... allow normal saving of this response ...
+
         # everything below stays the same (uses workflow_response)
-        agent_type = workflow_response.get("agent")
-        response_text = workflow_response.get("message")
+        agent_type = workflow_response.get("agent","system")
+        response_text = workflow_response.get("message") or workflow_response.get("response") or "Processing..."
         intent = workflow_response.get("intent")
         confidence = workflow_response.get("confidence", 0.0)
 
@@ -277,6 +292,7 @@ class AgentCoordinator:
             "turn_count": len(conv_context.messages),
             "escalated": conv_context.is_escalated,
             "escalation_id": escalation_id,
+            "status": workflow_response.get("status") or "success"
         }
 
 
@@ -551,3 +567,70 @@ class AgentCoordinator:
                 }
                 for c in conversations
             ]
+
+    # Approve/Resume Workflow
+
+
+    async def approve_intervention(self, conversation_id: int, new_response: str) -> Dict[str, Any]:
+        """
+        Admin approves (and edits) the response, then resumes the graph.
+        """
+        config = {"configurable": {"thread_id": str(conversation_id)}}
+
+        # 1. Re-instantiate workflow
+        workflow_wrapper = MessageWorkflow(
+            account_service=AccountService(),
+            customer_service=CustomerService(),
+            transaction_service=TransactionService(),
+            product_service=ProductService(),
+            conversation_service=ConversationService(),
+            faq_service=FAQService(),
+            checkpointer=self.checkpointer
+        )
+
+        # [FIX] Fetch current state to satisfy Pydantic validation requirements
+        snapshot = workflow_wrapper.workflow.get_state(config)
+        if not snapshot.values:
+             raise ValueError(f"No state found for conversation {conversation_id}")
+
+        # Merge existing state with our updates
+        # Ensure we work with a dictionary
+        current_state = snapshot.values
+        if hasattr(current_state, "model_dump"):
+            current_state = current_state.model_dump()
+        elif hasattr(current_state, "dict"):
+            current_state = current_state.dict()
+
+        # Create full payload (Original State + Updates)
+        update_payload = current_state.copy()
+        update_payload.update({
+            "agent_response": new_response,
+            "is_compliant": True,
+            "required_disclaimers": []
+        })
+
+        # 2. Update State (Now passing FULL object)
+        workflow_wrapper.workflow.update_state(
+            config,
+            update_payload
+        )
+
+        self.logger.info(f"✅ Admin updated state for {conversation_id}. Resuming...")
+
+        # 3. Resume (Call None to proceed from interrupt)
+        final_state = await workflow_wrapper.workflow.ainvoke(None, config=config)
+
+        # 4. Save the Final Approved Response to DB
+        response_data = final_state.get("final_response", {})
+        async with AsyncSessionLocal() as session:
+            msg_svc = MessageService(db=session)
+            await msg_svc.add_message(
+                conversation_id=conversation_id,
+                role=MessageRole.AGENT,
+                content=response_data.get("message"),
+                agent_name=response_data.get("agent"),
+                intent=response_data.get("intent"),
+                confidence_score=99
+            )
+
+        return response_data
