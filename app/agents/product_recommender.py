@@ -7,6 +7,9 @@ from groq import AsyncGroq
 from app.agents.base import BaseAgent, AgentConfig, AgentResponse
 from app.services import ProductService
 
+from langfuse import observe
+from langfuse import get_client
+
 class ProductRecommenderAgent(BaseAgent):
     def __init__(self, config: Optional[AgentConfig] = None, product_service: ProductService = None, **kwargs):
         super().__init__(name="product_recommender", config=config)
@@ -15,6 +18,7 @@ class ProductRecommenderAgent(BaseAgent):
 
         self.product_service = product_service
 
+    @observe(name="ProductRecommender")
     async def process(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentResponse:
         await self.validate_input(input_data)
         self.log_request(input_data)
@@ -46,8 +50,15 @@ class ProductRecommenderAgent(BaseAgent):
                 metadata={"error": str(e)},
                 confidence=0.0
             )
-
+    #  Decorate this helper as a 'generation' to capture LLM inputs/outputs
+    @observe(as_type="generation", name="Groq-Product-Recs")
     async def _generate_recommendations(self, service: ProductService, intent: str, message: str, customer_profile: Dict[str, Any]) -> Dict[str, Any]:
+        # 1. Update trace with model params
+        langfuse = get_client()
+        langfuse.update_current_generation(
+            model=self.config.model_name,
+            model_parameters={"temperature": 0.5, "max_tokens": self.config.max_tokens}
+        )
         # 1. Map intent to DB type (loan, credit, savings, current)
         category = self._determine_category(intent)
 
@@ -65,17 +76,34 @@ class ProductRecommenderAgent(BaseAgent):
 
         # 3. Build Prompt & Call LLM
         prompt = self._build_recommendation_prompt(intent, message, customer_profile, available_products)
-        response = await self.client.chat.completions.create(
-            model=self.config.model_name,
-            messages=[
-                {"role": "system", "content": self._get_system_prompt()},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.5,
-            max_tokens=self.config.max_tokens,
-        )
 
-        return self._parse_recommendation_response(response.choices[0].message.content, available_products)
+        # ADDED: Manually track generation
+
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.config.model_name,
+                messages=[
+                    {"role": "system", "content": self._get_system_prompt()},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.5,
+                max_tokens=self.config.max_tokens,
+            )
+
+            #  Update usage stats on the active generation
+            langfuse.update_current_generation(
+                usage_details={
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens
+                }
+            )
+
+            return self._parse_recommendation_response(response.choices[0].message.content, available_products)
+
+        except Exception as e:
+            raise e
+
 
     def _determine_category(self, intent: str) -> str:
         # Maps Agent Intent -> DB 'type' column

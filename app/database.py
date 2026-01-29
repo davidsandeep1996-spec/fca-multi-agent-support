@@ -34,7 +34,6 @@ engine = create_async_engine(
     max_overflow=settings.database_max_overflow,  # Max connections above pool_size
     pool_pre_ping=True,  # Verify connections before using
     pool_recycle=3600,  # Recycle connections after 1 hour
-    poolclass=QueuePool if not settings.is_production else QueuePool,
 )
 
 

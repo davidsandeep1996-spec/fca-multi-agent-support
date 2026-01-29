@@ -11,6 +11,7 @@ from enum import Enum
 from pydantic import BaseModel
 from app.agents.base import BaseAgent, AgentConfig, AgentResponse
 from app.services import ConversationService
+from langfuse import observe
 
 class EscalationPriority(str, Enum):
     """Escalation priority levels."""
@@ -77,7 +78,7 @@ class HumanAgent(BaseAgent):
     # ========================================================================
     # CORE PROCESSING
     # ========================================================================
-
+    @observe(name="HumanAgent")
     async def process(
         self,
         input_data: Dict[str, Any],

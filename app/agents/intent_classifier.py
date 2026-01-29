@@ -6,6 +6,8 @@ Classifies customer intent from messages to route to appropriate specialists.
 
 from typing import Dict, Any, Optional, List
 from groq import AsyncGroq
+from langfuse import observe
+from langfuse import get_client
 
 from app.agents.base import BaseAgent, AgentConfig, AgentResponse
 from app.services import ProductService
@@ -119,7 +121,7 @@ class IntentClassifierAgent(BaseAgent):
     # ========================================================================
     # CORE PROCESSING
     # ========================================================================
-
+    @observe(name="IntentClassifier")
     async def process(
         self,
         input_data: Dict[str, Any],
@@ -169,7 +171,8 @@ class IntentClassifierAgent(BaseAgent):
     # ========================================================================
     # CLASSIFICATION LOGIC
     # ========================================================================
-
+    # Decorate the classification logic as a generation
+    @observe(as_type="generation", name="Groq-Intent-Classification")
     async def _classify_intent(
         self,
         message: str,
@@ -185,30 +188,51 @@ class IntentClassifierAgent(BaseAgent):
         Returns:
             dict: Classification result
         """
+        # Initialize Langfuse client for updates
+        langfuse = get_client()
+        langfuse.update_current_generation(
+            model=self.config.model_name,
+            model_parameters={"temperature": self.config.temperature}
+        )
         # Build prompt
         prompt = self._build_classification_prompt(message, context)
+        try:
 
-        # Call LLM
-        response = await self.client.chat.completions.create(
-            model=self.config.model_name,
-            messages=[
-                {
-                    "role": "system",
-                    "content": self._get_system_prompt(),
-                },
-                {
-                    "role": "user",
-                    "content": prompt,
-                },
-            ],
-            temperature=self.config.temperature,
-            max_tokens=self.config.max_tokens,
-        )
 
-        # Parse response
-        result = self._parse_llm_response(response.choices[0].message.content)
 
-        return result
+            # Call LLM
+            response = await self.client.chat.completions.create(
+                model=self.config.model_name,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": self._get_system_prompt(),
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    },
+                ],
+                temperature=self.config.temperature,
+                max_tokens=self.config.max_tokens,
+            )
+
+            # Update Usage
+            langfuse.update_current_generation(
+                usage_details={
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens
+                }
+            )
+
+
+            # Parse response
+            result = self._parse_llm_response(response.choices[0].message.content)
+
+            return result
+        except Exception as e:
+            raise e
 
     def _build_classification_prompt(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
         # Intent descriptions

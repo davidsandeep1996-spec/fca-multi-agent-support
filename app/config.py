@@ -7,7 +7,8 @@ Settings are loaded from environment variables with validation and type checking
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator
-from typing import List, Literal
+from typing import Optional
+from typing import List, Literal,Optional
 import json
 
 
@@ -17,6 +18,7 @@ class Settings(BaseSettings):
 
     All settings are loaded from .env file and environment variables.
     Type validation is automatic via Pydantic.
+
     """
 
     # ========================================================================
@@ -181,6 +183,26 @@ class Settings(BaseSettings):
         description="Maximum request body size (bytes)",
     )
 
+    #  Add Langfuse / Observability Settings
+    # ========================================================================
+    # OBSERVABILITY SETTINGS (Langfuse)
+    # ========================================================================
+
+    langfuse_public_key: Optional[str] = Field(
+        default=None,
+        description="Langfuse Public Key (pk-...)",
+    )
+
+    langfuse_secret_key: Optional[str] = Field(
+        default=None,
+        description="Langfuse Secret Key (sk-...)",
+    )
+
+    langfuse_host: str = Field(
+        default="https://cloud.langfuse.com",
+        description="Langfuse Host URL",
+    )
+
     # ========================================================================
     # PYDANTIC CONFIGURATION
     # ========================================================================
@@ -333,6 +355,11 @@ class Settings(BaseSettings):
                 "handlers": ["console", "file"],
             },
         }
+    #  Add computed property for observability
+    @property
+    def is_observability_enabled(self) -> bool:
+        """Check if Langfuse is configured."""
+        return bool(self.langfuse_public_key and self.langfuse_secret_key)
 
 
 # ============================================================================

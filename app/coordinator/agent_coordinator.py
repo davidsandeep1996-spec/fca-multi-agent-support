@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 import logging
 from pydantic import BaseModel, Field
-
+from langfuse import observe
 from langgraph.checkpoint.memory import MemorySaver
 
 from app.workflows.message_workflow import MessageWorkflow
@@ -157,7 +157,7 @@ class AgentCoordinator:
             )
 
         return self.conversations[conversation_id]
-
+    @observe(name="AgentCoordinator")
     async def process_message(self, message: str, customer_id: int, conversation_id: int, context=None):
         self.logger.info(f"\n🔄 Coordinating message for customer {customer_id}")
 

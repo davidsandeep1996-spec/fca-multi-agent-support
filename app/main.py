@@ -11,6 +11,10 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 import logging
 
+
+from prometheus_fastapi_instrumentator import Instrumentator
+
+
 from fastapi.responses import StreamingResponse
 import json
 from app.coordinator.agent_coordinator import AgentCoordinator
@@ -22,6 +26,7 @@ from app.database import init_db, close_db
 from app.api.routes.messages import router as messages_router
 from app.routers.admin import router as admin_router
 
+from prometheus_fastapi_instrumentator import Instrumentator
 
 # Import routers
 from app.routers import health
@@ -55,6 +60,22 @@ async def lifespan(app: FastAPI):
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Debug mode: {settings.debug}")
 
+    #  Log Observability Status
+    if settings.is_observability_enabled:
+        logger.info("🔭 Observability: ENABLED (Langfuse)")
+    else:
+        logger.info("🔭 Observability: DISABLED (Missing keys)")
+
+    logger.info("📊 Prometheus Metrics: ENABLED at /metrics")
+
+
+
+
+
+
+
+
+
     # Initialize database (development only)
     if settings.is_development:
         logger.info("Initializing database tables (development mode)")
@@ -64,6 +85,8 @@ async def lifespan(app: FastAPI):
             logger.error(f"Database initialization failed: {e}", exc_info=True)
 
     logger.info("Application startup complete")
+
+
 
     yield  # Application runs here
 
@@ -130,6 +153,15 @@ def create_application() -> FastAPI:
         GZipMiddleware,
         minimum_size=1000,  # Only compress responses > 1KB
     )
+
+    #  Instrument Prometheus HERE (Before app starts)
+    instrumentator = Instrumentator(
+        should_group_status_codes=False,
+        should_ignore_untemplated=True,
+        should_instrument_requests_inprogress=True,
+        excluded_handlers=["/metrics", "/health", "/docs", "/openapi.json"],
+    )
+    instrumentator.instrument(app).expose(app, include_in_schema=False)
 
 
 

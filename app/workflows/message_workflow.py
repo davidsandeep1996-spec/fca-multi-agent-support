@@ -10,6 +10,8 @@ from enum import Enum
 from pydantic import BaseModel, Field, ConfigDict
 import logging
 
+from langfuse import observe
+
 from langgraph.graph import StateGraph, END
 from app.schemas.common import WorkflowState
 from app.agents.intent_classifier import IntentClassifierAgent
@@ -129,7 +131,7 @@ class MessageWorkflow:
     # ========================================================================
 
 
-
+    @observe(as_type="span", name="Node: Classify")
     async def _node_classify(self, state: WorkflowState) -> Dict[str, Any]:
         """Classify intent."""
         self.logger.info("📋 Classifying message intent...")
@@ -153,7 +155,7 @@ class MessageWorkflow:
             "intent_confidence": confidence,
             "classifier_response": classification.content
         }
-
+    @observe(as_type="span", name="Node: Account")
     async def _node_account(self, state: WorkflowState) -> Dict[str, Any]:
         """Handle account inquiries."""
         self.logger.info("🏦 Processing account inquiry...")
@@ -177,6 +179,8 @@ class MessageWorkflow:
             "agent_metadata": response.metadata,
             "confidence": response.confidence
         }
+
+    @observe(as_type="span", name="Node: General")
     async def _node_general(self, state: WorkflowState) -> Dict[str, Any]:
         """Handle general inquiries."""
         self.logger.info("❓ Processing general inquiry...")
@@ -198,7 +202,7 @@ class MessageWorkflow:
             "agent_metadata": response.metadata,
             "confidence": response.confidence
         }
-
+    @observe(as_type="span", name="Node: Product")
     async def _node_product(self, state: WorkflowState) -> Dict[str, Any]:
         """Handle product recommendations."""
         self.logger.info("💼 Processing product inquiry...")
@@ -224,7 +228,7 @@ class MessageWorkflow:
             "agent_metadata": response.metadata,
             "confidence": response.confidence
         }
-
+    @observe(as_type="span", name="Node: Compliance")
     async def _node_compliance(self, state: WorkflowState) -> Dict[str, Any]:
         """Check compliance of product recommendations."""
         self.logger.info("⚖️ Checking FCA compliance...")
@@ -258,7 +262,7 @@ class MessageWorkflow:
 
         # 3. RETURN UPDATES
         return updates
-
+    @observe(as_type="span", name="Node: Human")
     async def _node_human(self, state: WorkflowState) -> Dict[str, Any]:
         """Escalate to human agent."""
         self.logger.info("👤 Escalating to human specialist...")
@@ -285,7 +289,7 @@ class MessageWorkflow:
             "agent_metadata": response.metadata,
             "confidence": response.confidence
         }
-
+    @observe(as_type="span", name="Node: End")
     async def _node_end(self, state: WorkflowState) -> Dict[str, Any]:
         """Final response formatting."""
         self.logger.info("📤 Formatting final response...")
@@ -346,7 +350,7 @@ class MessageWorkflow:
     # ========================================================================
     # PUBLIC INTERFACE
     # ========================================================================
-
+    @observe(name="MessageWorkflow")
     async def process_message(
         self,
         message: str,

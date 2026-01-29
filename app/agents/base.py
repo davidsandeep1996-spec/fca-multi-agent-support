@@ -13,6 +13,10 @@ from app.schemas.common import AgentResponse
 from app.config import settings
 
 
+from langfuse.langchain import CallbackHandler as LangfuseCallbackHandler
+
+
+
 
 class AgentConfig:
     """
@@ -80,6 +84,9 @@ class BaseAgent(ABC):
         self.logger = logging.getLogger(f"agent.{name}")
         self.tools = []
         self.services = services or {}
+
+        #  Initialize Observability
+        self.trace_handler = self._setup_observability()
 
         # Agent metadata
         self.description = self._get_description()
@@ -234,3 +241,36 @@ class BaseAgent(ABC):
     def __repr__(self) -> str:
         """String representation."""
         return f"<{self.__class__.__name__}(name='{self.name}')>"
+
+
+    def _setup_observability(self):
+        """
+        Initialize Langfuse callback handler if configured.
+        Returns None if credentials are missing or lib not installed.
+        """
+        if not settings.is_observability_enabled:
+            return None
+
+        if LangfuseCallbackHandler is None:
+            self.logger.warning("Langfuse not installed. Run 'pip install langfuse'")
+            return None
+
+        try:
+            return LangfuseCallbackHandler(
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to initialize Langfuse: {e}")
+            return None
+
+
+    #  Helper to get callbacks for LLM calls
+    def get_llm_callbacks(self) -> List[Any]:
+        """
+        Get list of callbacks for LLM invocation.
+        Use this in your agent's process() method when calling invoke().
+        Example: llm.invoke(prompt, config={"callbacks": self.get_llm_callbacks()})
+        """
+        callbacks = []
+        if self.trace_handler:
+            callbacks.append(self.trace_handler)
+        return callbacks

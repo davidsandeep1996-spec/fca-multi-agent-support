@@ -1,7 +1,7 @@
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from groq import AsyncGroq
-
+from langfuse import observe
 from app.agents.base import BaseAgent, AgentConfig, AgentResponse
 from app.services import AccountService, CustomerService, TransactionService
 
@@ -36,6 +36,8 @@ class AccountAgent(BaseAgent):
             "Natural language account information",
         ]
 
+    
+    @observe(name="AccountAgent")
     async def process(
         self,
         input_data: Dict[str, Any],

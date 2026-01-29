@@ -6,6 +6,10 @@ from groq import AsyncGroq
 from app.agents.base import BaseAgent, AgentConfig, AgentResponse
 from app.services.faq_service import FAQService
 
+from langfuse import observe
+
+from langfuse import get_client
+
 class GeneralAgent(BaseAgent):
     def __init__(self, config: Optional[AgentConfig] = None, faq_service: FAQService = None, **kwargs):
         super().__init__(name="general_agent", config=config)
@@ -14,6 +18,7 @@ class GeneralAgent(BaseAgent):
         # [CRITICAL] This must be here to use the DB
         self.faq_service = faq_service
 
+    @observe(name="GeneralAgent")
     async def process(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentResponse:
         await self.validate_input(input_data)
         message = input_data.get("message", "")
@@ -29,7 +34,16 @@ class GeneralAgent(BaseAgent):
                 confidence=1.0
             )
 
-        # 2. Fallback to LLM
+        return await self._generate_llm_response(message)
+
+    @observe(as_type="generation", name="Groq-General-Chat")
+    async def _generate_llm_response(self, message: str) -> AgentResponse:
+        langfuse = get_client()
+        langfuse.update_current_generation(
+            model=self.config.model_name,
+            model_parameters={"temperature": 0.7}
+        )
+
         try:
             response = await self.client.chat.completions.create(
                 model=self.config.model_name,
@@ -39,6 +53,15 @@ class GeneralAgent(BaseAgent):
                 ],
                 temperature=0.7
             )
+
+            langfuse.update_current_generation(
+                usage_details={
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens
+                }
+            )
+
             return self.create_response(
                 content=response.choices[0].message.content,
                 metadata={"source": "llm_fallback"},

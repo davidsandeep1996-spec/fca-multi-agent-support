@@ -1,0 +1,38 @@
+# --- Core ---
+pydantic
+pydantic-settings
+python-dotenv
+click
+
+# --- Database ---
+SQLAlchemy
+alembic
+asyncpg
+greenlet
+psycopg2-binary
+
+# --- AI ---
+groq
+langchain
+langchain-groq
+langgraph
+langgraph-checkpoint
+langgraph-sdk
+
+# --- Utilities ---
+httpx
+requests
+python-dateutil
+python-multipart
+faker
+
+# --- Testing ---
+pytest
+pytest-asyncio
+pytest-cov
+
+# --- Server & Observability ---
+fastapi
+uvicorn
+langfuse
+prometheus-fastapi-instrumentator

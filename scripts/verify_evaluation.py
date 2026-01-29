@@ -1,17 +1,15 @@
 """
 Verify Evaluation (Full Regression Suite)
-Runs 50 Golden Questions with strict throttling (1 min sleep every 3 requests)
-to guarantee completion on Free Tier API keys.
+HITS THE REAL SERVER AT http://localhost:8000
 """
 import asyncio
 import time
-import sys
+import importlib.metadata
 from httpx import AsyncClient, Timeout
-from app.main import app
-from app.database import check_db_connection
+from app.config import settings
 
 # ==============================================================================
-# 1. GOLDEN DATASET (50 Questions)
+# 1. GOLDEN DATASET
 # ==============================================================================
 GOLDEN_DATA = [
     # --- ACCOUNT INQUIRY ---
@@ -73,52 +71,63 @@ GOLDEN_DATA = [
     {"q": "This information is wrong, who can I call?", "intent": "complaint"},
 ]
 
-# Acceptable mappings (Classifier Intent -> Acceptable Group)
+
 INTENT_MAPPINGS = {
     "account_inquiry": ["account_inquiry", "account"],
-    # Allow loan/credit card specific intents to map to 'product' or 'loan'
     "product_inquiry": ["product_inquiry", "product", "loan_inquiry", "credit_card", "general_inquiry"],
     "loan_inquiry": ["loan_inquiry", "product", "loan", "product_inquiry"],
-    # Allow account management tasks to fall under general or account
     "general_inquiry": ["general_inquiry", "general", "account_inquiry"],
     "complaint": ["complaint", "human_handoff", "human", "general_inquiry"]
 }
 
-async def run_evaluation():
+def print_observability_status():
     print("\n" + "="*80)
-    print("🧪 FULL REGRESSION TEST (50 Questions)")
-    print("   Throttling: 1 minute pause every 3 requests")
+    print("🔭 DIAGNOSTICS (Client Side)")
+    print("="*80)
+    print(f"Target URL:           http://localhost:8000")
+    print(f"Langfuse Host:        {settings.langfuse_host}")
+    print("="*80 + "\n")
+
+async def run_evaluation():
+    print_observability_status()
+    print("🧪 STARTING NETWORK TEST (Real Server)")
     print("="*80)
 
     results = []
 
-    # Long timeout for the client itself
-    async with AsyncClient(app=app, base_url="http://test", timeout=Timeout(60.0)) as client:
+    # [FIX] No ASGITransport. Connect to localhost:8000
+    async with AsyncClient(base_url="http://localhost:8000", timeout=Timeout(60.0)) as client:
 
+        # 1. First, check if server is actually up
+        try:
+            resp = await client.get("/api/v1/health")
+            if resp.status_code == 200:
+                print("✅ Server is UP and reachable!")
+            else:
+                print(f"❌ Server returned {resp.status_code}. Is it running?")
+                return
+        except Exception as e:
+            print(f"❌ could not connect to server: {e}")
+            print("Make sure 'docker compose up' is running in another terminal.")
+            return
+
+        # 2. Run Questions
         for i, case in enumerate(GOLDEN_DATA):
             question = case["q"]
             expected_intent = case["intent"]
 
-            # --- THROTTLING LOGIC ---
-            # Every 3 requests (start index 0: 0, 1, 2 -> pause before 3)
-            if i > 0 and i % 3 == 0:
-                print(f"\n⏳ [Throttling] Processed {i} requests. Pausing 60s for API quota reset...", end="", flush=True)
-                time.sleep(60)
+            # Throttling
+            if i > 0 and i % 5 == 0:
+                print(f"\n⏳ Pausing 10s...", end="", flush=True)
+                time.sleep(10)
                 print(" Resuming.")
 
             print(f"[{i+1}/{len(GOLDEN_DATA)}] Q: '{question}'", end=" ", flush=True)
 
-            result_entry = {
-                "question": question,
-                "expected": expected_intent,
-                "status": "fail",
-                "actual": "N/A",
-                "agent": "N/A",
-                "error": ""
-            }
+            result_entry = {"question": question, "status": "fail"}
 
             try:
-                # Use unique ID to prevent context pollution
+                # [FIX] Ensure we send correct payload
                 response = await client.post(
                     "/api/v1/messages/process",
                     json={
@@ -131,62 +140,28 @@ async def run_evaluation():
                 if response.status_code == 200:
                     data = response.json()
                     actual_intent = data.get("metadata", {}).get("intent", "N/A")
-                    agent = data.get("agent", "N/A")
 
-                    # Evaluation Logic
                     acceptable = INTENT_MAPPINGS.get(expected_intent, [expected_intent])
                     is_match = (actual_intent in acceptable)
 
-                    result_entry["actual"] = actual_intent
-                    result_entry["agent"] = agent
-                    result_entry["status"] = "pass" if is_match else "fail"
-
                     if is_match:
                         print(f"✅")
+                        result_entry["status"] = "pass"
                     else:
-                        print(f"⚠️  (Got: {actual_intent})")
-
+                        print(f"⚠️  ({actual_intent})")
                 else:
-                    result_entry["error"] = f"HTTP {response.status_code}"
                     print(f"❌ HTTP {response.status_code}")
 
             except Exception as e:
-                result_entry["error"] = str(e)[:50]
-                print(f"❌ {result_entry['error']}")
+                print(f"❌ Error: {str(e)[:50]}")
 
-            results.append(result_entry)
-
-            # Small buffer between normal requests
             time.sleep(1)
 
-    # ==========================================
-    # FINAL REPORT
-    # ==========================================
-    print("\n" + "="*110)
-    print("📊 FINAL VERIFICATION REPORT")
-    print("="*110)
-    print(f"{'QUESTION':<40} | {'EXPECTED':<16} | {'ACTUAL':<16} | {'STATUS'}")
-    print("-" * 110)
-
-    passed_count = 0
-    for r in results:
-        status_icon = "✅" if r["status"] == "pass" else "❌"
-        if r["status"] == "pass": passed_count += 1
-
-        q_display = (r['question'][:37] + '..') if len(r['question']) > 37 else r['question']
-
-        # If error exists, show that in Actual column
-        actual_display = r['error'] if r['error'] else r['actual']
-
-        print(f"{q_display:<40} | {r['expected']:<16} | {actual_display:<16} | {status_icon}")
-
-    print("="*110)
-    print(f"Total: {len(GOLDEN_DATA)} | Passed: {passed_count} | Failed: {len(GOLDEN_DATA) - passed_count}")
-    print(f"Accuracy: {(passed_count / len(GOLDEN_DATA)) * 100:.1f}%")
-    print("="*110)
+    print("\n" + "="*80)
+    print("DONE. Check your Langfuse Dashboard and /metrics now.")
+    print("="*80)
 
 if __name__ == "__main__":
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(check_db_connection())
     loop.run_until_complete(run_evaluation())

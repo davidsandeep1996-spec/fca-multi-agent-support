@@ -8,6 +8,9 @@ Validates messages, products, and customer interactions for regulatory complianc
 from typing import Dict, Any, Optional, List
 from groq import AsyncGroq
 
+from langfuse import observe
+from langfuse import get_client
+
 from app.agents.base import BaseAgent, AgentConfig, AgentResponse
 
 
@@ -100,7 +103,7 @@ class ComplianceCheckerAgent(BaseAgent):
     # ========================================================================
     # CORE PROCESSING
     # ========================================================================
-
+    @observe(name="ComplianceChecker")
     async def process(
         self,
         input_data: Dict[str, Any],
@@ -227,7 +230,7 @@ class ComplianceCheckerAgent(BaseAgent):
                 )
 
         return issues
-
+    @observe(as_type="generation", name="Groq-Compliance-Check")
     async def _llm_compliance_check(
         self,
         content: str,
@@ -243,30 +246,47 @@ class ComplianceCheckerAgent(BaseAgent):
         Returns:
             dict: LLM check results
         """
+
+        langfuse = get_client()
+        langfuse.update_current_generation(
+            model=self.config.model_name,
+            model_parameters={"temperature": 0.1}
+        )
         # Build prompt
         prompt = self._build_compliance_prompt(content, product_type)
 
-        # Call LLM
-        response = await self.client.chat.completions.create(
-            model=self.config.model_name,
-            messages=[
-                {
-                    "role": "system",
-                    "content": self._get_system_prompt(),
-                },
-                {
-                    "role": "user",
-                    "content": prompt,
-                },
-            ],
-            temperature=0.1,  # Very low for consistent compliance checks
-            max_tokens=self.config.max_tokens,
-        )
+        try:
 
-        # Parse response
-        result = self._parse_compliance_response(response.choices[0].message.content)
+            # Call LLM
+            response = await self.client.chat.completions.create(
+                model=self.config.model_name,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": self._get_system_prompt(),
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    },
+                ],
+                temperature=0.1,  # Very low for consistent compliance checks
+                max_tokens=self.config.max_tokens,
+            )
+            # Update Usage
+            langfuse.update_current_generation(
+                usage_details={
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens
+                }
+            )
+            # Parse response
+            result = self._parse_compliance_response(response.choices[0].message.content)
 
-        return result
+            return result
+        except Exception as e:
+            raise e
 
     def _build_compliance_prompt(
         self,
