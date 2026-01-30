@@ -45,14 +45,18 @@ class GeneralAgent(BaseAgent):
         )
 
         try:
-            response = await self.client.chat.completions.create(
-                model=self.config.model_name,
-                messages=[
-                    {"role": "system", "content": "You are a helpful banking assistant."},
-                    {"role": "user", "content": message}
-                ],
-                temperature=0.7
-            )
+            # WRAP LLM CALL
+            async def _call_llm():
+                return await self.client.chat.completions.create(
+                    model=self.config.model_name,
+                    messages=[
+                        {"role": "system", "content": "You are a helpful banking assistant."},
+                        {"role": "user", "content": message}
+                    ],
+                    temperature=0.7
+                )
+
+            response = await self.execute_with_retry(_call_llm)
 
             langfuse.update_current_generation(
                 usage_details={

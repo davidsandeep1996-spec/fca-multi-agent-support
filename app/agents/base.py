@@ -12,10 +12,42 @@ import logging
 from app.schemas.common import AgentResponse
 from app.config import settings
 
+from tenacity import (
+    AsyncRetrying,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    before_sleep_log
+)
 
 from langfuse.langchain import CallbackHandler as LangfuseCallbackHandler
 
+# Simple Circuit Breaker
+class SimpleCircuitBreaker:
+    def __init__(self, failure_threshold: int = 5, recovery_timeout: int = 60):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.failures = 0
+        self.last_failure_time = 0
+        self.state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
 
+    def allow_request(self) -> bool:
+        if self.state == "OPEN":
+            if time.time() - self.last_failure_time > self.recovery_timeout:
+                self.state = "HALF_OPEN"
+                return True
+            return False
+        return True
+
+    def record_success(self):
+        self.failures = 0
+        self.state = "CLOSED"
+
+    def record_failure(self):
+        self.failures += 1
+        self.last_failure_time = time.time()
+        if self.failures >= self.failure_threshold:
+            self.state = "OPEN"
 
 
 class AgentConfig:
@@ -88,6 +120,12 @@ class BaseAgent(ABC):
         #  Initialize Observability
         self.trace_handler = self._setup_observability()
 
+        #  Use Settings instead of hardcoded 5/60
+        self.circuit_breaker = SimpleCircuitBreaker(
+            failure_threshold=settings.circuit_breaker_threshold,
+            recovery_timeout=settings.circuit_breaker_recovery_timeout
+        )
+
         # Agent metadata
         self.description = self._get_description()
         self.capabilities = self._get_capabilities()
@@ -96,6 +134,41 @@ class BaseAgent(ABC):
         self._initialize()
 
 
+
+    #  Shared Execute with Retry & Circuit Breaker
+    async def execute_with_retry(self, func: Callable, *args, **kwargs):
+        """
+        Executes an async function with:
+        1. Circuit Breaker check
+        2. Retries with exponential backoff
+        """
+        # 1. Circuit Breaker Check
+        if not self.circuit_breaker.allow_request():
+            self.logger.warning(f"Circuit Breaker OPEN for {self.name}. Failing fast.")
+            raise Exception(f"Service temporarily unavailable (Circuit Breaker Open)")
+
+        try:
+            # 2. Retry Logic (Tenacity)
+            # Retries 3 times, waiting 1s, 2s, 4s...
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential(multiplier=1, min=1, max=10),
+                retry=retry_if_exception_type(Exception), # Retry on any exception (customize as needed)
+                before_sleep=before_sleep_log(self.logger, logging.WARNING),
+                reraise=True
+            ):
+                with attempt:
+                    result = await func(*args, **kwargs)
+
+                    # If success, reset breaker
+                    self.circuit_breaker.record_success()
+                    return result
+
+        except Exception as e:
+            # If all retries fail, record failure in breaker
+            self.circuit_breaker.record_failure()
+            self.logger.error(f"Operation failed after retries: {e}")
+            raise e
 
     # ========================================================================
     # ABSTRACT METHODS (must be implemented by subclasses)

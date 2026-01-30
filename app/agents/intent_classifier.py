@@ -200,22 +200,19 @@ class IntentClassifierAgent(BaseAgent):
 
 
 
-            # Call LLM
-            response = await self.client.chat.completions.create(
-                model=self.config.model_name,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": self._get_system_prompt(),
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt,
-                    },
-                ],
-                temperature=self.config.temperature,
-                max_tokens=self.config.max_tokens,
-            )
+            async def _call_llm():
+                return await self.client.chat.completions.create(
+                    model=self.config.model_name,
+                    messages=[
+                        {"role": "system", "content": self._get_system_prompt()},
+                        {"role": "user", "content": prompt},
+                    ],
+                    temperature=self.config.temperature,
+                    max_tokens=self.config.max_tokens,
+                )
+
+            # Execute with stability logic
+            response = await self.execute_with_retry(_call_llm)
 
             # Update Usage
             langfuse.update_current_generation(

@@ -154,6 +154,23 @@ class Settings(BaseSettings):
     )
 
     # ========================================================================
+    # STABILITY / CIRCUIT BREAKER SETTINGS
+    # ========================================================================
+
+    circuit_breaker_threshold: int = Field(
+        default=5,
+        ge=1,
+        description="Number of failures before opening the circuit",
+    )
+
+    circuit_breaker_recovery_timeout: int = Field(
+        default=60,
+        ge=1,
+        description="Seconds to wait before trying again (Half-Open state)",
+    )
+
+
+    # ========================================================================
     # LOGGING SETTINGS
     # ========================================================================
 

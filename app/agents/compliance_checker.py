@@ -257,22 +257,19 @@ class ComplianceCheckerAgent(BaseAgent):
 
         try:
 
-            # Call LLM
-            response = await self.client.chat.completions.create(
-                model=self.config.model_name,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": self._get_system_prompt(),
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt,
-                    },
-                ],
-                temperature=0.1,  # Very low for consistent compliance checks
-                max_tokens=self.config.max_tokens,
-            )
+            # WRAP LLM CALL
+            async def _call_llm():
+                return await self.client.chat.completions.create(
+                    model=self.config.model_name,
+                    messages=[
+                        {"role": "system", "content": self._get_system_prompt()},
+                        {"role": "user", "content": prompt},
+                    ],
+                    temperature=0.1,
+                    max_tokens=self.config.max_tokens,
+                )
+
+            response = await self.execute_with_retry(_call_llm)
             # Update Usage
             langfuse.update_current_generation(
                 usage_details={
