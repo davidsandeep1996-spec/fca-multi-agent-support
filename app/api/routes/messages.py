@@ -52,8 +52,23 @@ class AgentMetadata(BaseModel):
 class MessageResponse(BaseModel):
     """API response."""
     response: str
-    metadata: Dict[str, Any]
     status: str = "success"
+
+    conversation_id: int
+
+    # [FIX] These fields must be present so FastAPI doesn't delete them!
+    agent: Optional[str] = "system"
+    intent: Optional[str] = None
+    confidence: float = 0.0
+    metadata: Optional[Dict[str, Any]] = {}
+
+    # Optional: status fields
+    turn_count: int = 0
+
+    # [FIX] Allow extra fields just in case
+    model_config = {
+        "extra": "ignore"
+    }
 
 
 class ConversationHistoryItem(BaseModel):
@@ -85,7 +100,7 @@ class ConversationStats(BaseModel):
 # MESSAGE ENDPOINTS
 # ============================================================================
 
-@router.post("/messages/process", response_model=MessageResponse)
+@router.post("/messages/process")
 async def process_message(request: MessageRequest) -> MessageResponse:
     """
     Process customer message through agent system.
@@ -114,16 +129,28 @@ async def process_message(request: MessageRequest) -> MessageResponse:
             conversation_id=request.conversation_id,
         )
 
+        # [DEBUG] Print exactly what we are returning
+        print(f"DEBUG RETURN DATA: {response}", flush=True)
+
         return MessageResponse(
             response=response["response"],
+
+            # 1. CRITICAL FIX: Pass conversation_id at the TOP LEVEL
+            conversation_id=response["conversation_id"],
+
+            # 2. Map other top-level fields defined in your Schema
+            agent=response.get("agent", "system"),
+            intent=response.get("intent"),
+            confidence=response.get("confidence", 0.0),
+            turn_count=response.get("turn_count", 0),
+            status=response.get("status", "success"),
+
+            # 3. Pass everything else (including escalation_id) into metadata
             metadata={
-                "agent": response["agent"],
-                "intent": response["intent"],
-                "confidence": response["confidence"],
-                "turn_count": response["turn_count"],
-                "escalated": response["escalated"],
+                "escalated": response.get("escalated", False),
                 "escalation_id": response.get("escalation_id"),
-                "conversation_id": response.get("conversation_id"),
+                # Merge with any existing metadata from the agent (like violation details)
+                **response.get("metadata", {})
             }
         )
 

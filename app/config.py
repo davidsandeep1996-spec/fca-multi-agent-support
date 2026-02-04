@@ -137,6 +137,22 @@ class Settings(BaseSettings):
         description="Allowed CORS origins",
     )
 
+    security_enabled: bool = Field(
+        default=True,
+        description="Enable security guardrails (PII redaction & Injection checks)",
+    )
+
+    security_jailbreak_threshold: float = Field(
+        default=0.8,
+        ge=0.0,
+        le=1.0,
+        description="Threshold for jailbreak detection (higher = stricter)",
+    )
+
+    pii_redaction_enabled: bool = Field(
+        default=True,
+        description="Redact PII from logs and database",
+    )
     # ========================================================================
     # RATE LIMITING SETTINGS
     # ========================================================================

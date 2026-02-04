@@ -12,6 +12,8 @@ from pydantic import BaseModel, Field
 from langfuse import observe
 from langgraph.checkpoint.memory import MemorySaver
 
+from app.services.security_service import SecurityService
+
 from app.workflows.message_workflow import MessageWorkflow
 from app.database import AsyncSessionLocal
 from app.services import (
@@ -139,6 +141,10 @@ class AgentCoordinator:
 
         self.checkpointer = MemorySaver()
 
+
+
+        self.security_service = SecurityService()
+
     # ========================================================================
     # CONVERSATION MANAGEMENT
     # ========================================================================
@@ -159,7 +165,12 @@ class AgentCoordinator:
         return self.conversations[conversation_id]
     @observe(name="AgentCoordinator")
     async def process_message(self, message: str, customer_id: int, conversation_id: int, context=None):
+
+        sanitized_message = self.security_service.sanitize_input(message)
+
         self.logger.info(f"\n🔄 Coordinating message for customer {customer_id}")
+
+        self.logger.info(f"Message: {sanitized_message}")
 
         conv_context = self.get_or_create_conversation(customer_id, conversation_id)
 
@@ -184,10 +195,12 @@ class AgentCoordinator:
                         title="New Conversation",
                         channel="web" # or ConversationChannel.WEB
                     )
+                    await session.commit()
                     conversation_id = new_conv.id
                     self.logger.info(f"✅ Created conversation {conversation_id} for customer {customer_id}")
                 except Exception as e:
                     self.logger.warning(f"Could not auto-create conversation: {e}")
+                    await session.rollback()
 
         # [FIX] 1. Save User Message (Separate Session)
         async with AsyncSessionLocal() as session:
@@ -196,13 +209,14 @@ class AgentCoordinator:
                 await msg_svc.add_message(
                     conversation_id=conversation_id,
                     role=MessageRole.CUSTOMER,
-                    content=message,
+                    content=sanitized_message,
                     intent=None
                 )
+                await session.commit()
             except Exception as e:
                 self.logger.error(f"Failed to save user message: {e}")
 
-
+                await session.rollback()
 
             # build workflow WITH db-backed services
             workflow = MessageWorkflow(
@@ -228,7 +242,7 @@ class AgentCoordinator:
 
             # IMPORTANT: call the local workflow, not self.workflow
             workflow_response = await workflow.process_message(
-                message=message,
+                message=sanitized_message,
                 customer_id=customer_id,
                 conversation_id=conversation_id,
                 context=context,
@@ -263,8 +277,10 @@ class AgentCoordinator:
                     intent=intent,
                     confidence_score=int(confidence * 100) if confidence else 0
                 )
+                await session.commit()
             except Exception as e:
                 self.logger.error(f"Failed to save agent message: {e}")
+                await session.rollback()
 
         conv_context.add_message(
             message=message,
@@ -292,7 +308,8 @@ class AgentCoordinator:
             "turn_count": len(conv_context.messages),
             "escalated": conv_context.is_escalated,
             "escalation_id": escalation_id,
-            "status": workflow_response.get("status") or "success"
+            "status": workflow_response.get("status") or "success",
+            "metadata": workflow_response.get("metadata", {}),
         }
 
 

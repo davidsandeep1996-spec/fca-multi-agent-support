@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional, List
 from enum import Enum
 from pydantic import BaseModel, Field, ConfigDict
 import logging
-
+from app.services.security_service import SecurityService
 from langfuse import observe
 
 from langgraph.graph import StateGraph, END
@@ -63,7 +63,7 @@ class MessageWorkflow:
 
         # Initialize memory saver
         self.checkpointer = checkpointer
-
+        self.security_service = SecurityService()
         # Build LangGraph workflow
         self.graph = self._build_graph()
         self.workflow = self.graph.compile(checkpointer=self.checkpointer, interrupt_before=["human_approval"])
@@ -75,6 +75,8 @@ class MessageWorkflow:
         workflow = StateGraph(WorkflowState)
 
         # Define nodes
+        workflow.add_node("guardrail", self._node_guardrail)
+
         workflow.add_node("classify", self._node_classify)
         workflow.add_node("account", self._node_account)
         workflow.add_node("general", self._node_general)
@@ -86,7 +88,18 @@ class MessageWorkflow:
 
 
         # Entry point
-        workflow.set_entry_point("classify")
+        workflow.set_entry_point("guardrail")
+
+        #  Conditional Edge from Guardrail
+        workflow.add_conditional_edges(
+            "guardrail",
+            self._route_guardrail,
+            {
+                "safe": "classify",
+                "unsafe": "end"
+            }
+        )
+
 
         # Conditional routing from classifier
         workflow.add_conditional_edges(
@@ -126,10 +139,42 @@ class MessageWorkflow:
 
         return workflow
 
+    #  Add Routing Logic for Guardrail
+    def _route_guardrail(self, state: WorkflowState) -> str:
+        """Route based on security check."""
+        # If metadata contains 'blocked', it means guardrail failed
+        if state.agent_metadata and state.agent_metadata.get("blocked"):
+            return "unsafe"
+        return "safe"
+
     # ========================================================================
     # NODE IMPLEMENTATIONS
     # ========================================================================
 
+    @observe(as_type="span", name="Node: Guardrail")
+    async def _node_guardrail(self, state: WorkflowState) -> Dict[str, Any]:
+        """
+        Security Guardrail Node.
+        Checks for prompt injection/jailbreaks before ANY agent sees the message.
+        """
+        self.logger.info("🛡️  Running security guardrails...")
+
+        is_safe, reason = self.security_service.check_jailbreak(state.message)
+
+        if not is_safe:
+            print(f"\n!!!!!! GUARDRAIL HIT: {reason} !!!!!!\n", flush=True)
+            self.logger.warning(f"⛔ Security Violation: {reason}")
+            # We return a specific flag to route to END immediately
+            return {
+                "agent_type": "security_system",
+                "agent_response": "I cannot process that request due to safety guidelines.",
+                "agent_metadata": {"violation": reason, "blocked": True},
+                "confidence": 1.0,
+                "intent": "security_violation"
+            }
+
+        self.logger.info("✅ Security check passed")
+        return {} # No state change if safe
 
     @observe(as_type="span", name="Node: Classify")
     async def _node_classify(self, state: WorkflowState) -> Dict[str, Any]:
