@@ -30,6 +30,7 @@ from app.services.customer import CustomerService
 from app.services.conversation import ConversationService
 from app.services.message import MessageService
 from app.services import ProductService, AccountService, TransactionService
+from app.services.security_service import SecurityService
 from app.models.conversation import ConversationChannel
 from app.models.message import MessageRole
 from app.models.faq import FAQ
@@ -58,7 +59,7 @@ async def create_all_tables() -> None:
 # =============================================================================
 # Data generation
 # =============================================================================
-def generate_customers(count: int = 100) -> list[dict]:
+def generate_customers(count: int = 100, default_pwd_hash: str = None) -> list[dict]:
     customers: list[dict] = []
     for i in range(1, count + 1):
         customers.append(
@@ -69,6 +70,10 @@ def generate_customers(count: int = 100) -> list[dict]:
                 "email": fake.unique.email(),
                 "phone": fake.phone_number(),
                 "is_vip": fake.random_element([True, False, False, False]),  # ~25% VIP
+
+                "hashed_password": default_pwd_hash,
+                "role": "user",
+                "scopes": "read:accounts",
             }
         )
     return customers
@@ -124,7 +129,7 @@ SAMPLE_PRODUCTS = [
         "name": "Cashback Credit Card",
         "type": "credit",
         "description": "Earn cashback on everyday purchases",
-        "interest_rate": Decimal("21.9"),  # APR
+        "interest_rate": Decimal("9.9"),  # APR
         "features": ["Up to 1% cashback", "No annual fee", "Fraud protection"],
         "requirements": {"min_income": 20000},
         "is_active": True,
@@ -276,8 +281,14 @@ SAMPLE_CONVERSATIONS = [
 # =============================================================================
 async def seed_customers(count: int = 100) -> list[int]:
     logger.info(f"🌱 Seeding {count} customers...")
+
+    # [CHANGE 1c] Generate default password hash ('password123')
+    security = SecurityService()
+    default_hash = security.get_password_hash("password123")
+
+
     customer_ids: list[int] = []
-    customers_data = generate_customers(count)
+    customers_data = generate_customers(count, default_pwd_hash=default_hash )
     customers_failed = 0
 
     async with CustomerService() as service:
@@ -290,7 +301,7 @@ async def seed_customers(count: int = 100) -> list[int]:
             except Exception as e:
                 customers_failed += 1
                 await service.rollback()
-                logger.debug(f"⚠️  Skipped customer {data.get('email')}: {str(e)[:200]}")
+                logger.error(f"⚠️  Skipped customer {data.get('email')}: {str(e)[:200]}")
 
         await service.commit()
 
@@ -578,6 +589,9 @@ async def seed_all(clear_first: bool = False, customer_count: int = 100) -> None
         logger.info("-" * 70 + "\n")
 
         customer_ids = await seed_customers(customer_count)
+        if not customer_ids:
+            logger.error("❌ CRITICAL: No customers were created. Aborting seed.")
+            return
         product_ids = await seed_products()
         account_ids = await seed_accounts(customer_ids, product_ids)
         trans_count = await seed_transactions(account_ids)

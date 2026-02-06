@@ -99,6 +99,30 @@ class Customer(BaseModel):
     )
 
     # ========================================================================
+    #  AUTHENTICATION DATA
+    # ========================================================================
+
+    hashed_password = Column(
+        String(255),
+        nullable=True, # Nullable for legacy/migrated users initially
+        comment="Bcrypt hashed password",
+    )
+
+    role = Column(
+        String(20),
+        default="user",
+        nullable=False,
+        comment="RBAC Role: 'user', 'admin', 'auditor'",
+    )
+
+    scopes = Column(
+        String(255),
+        default="read:accounts",
+        nullable=False,
+        comment="Space-separated permissions e.g. 'read:accounts write:transfer'",
+    )
+
+    # ========================================================================
     # ADDITIONAL INFORMATION
     # ========================================================================
 

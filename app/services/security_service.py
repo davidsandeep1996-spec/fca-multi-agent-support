@@ -5,13 +5,25 @@ Handles PII redaction and Prompt Injection detection.
 Acts as a middleware for safety guardrails.
 """
 import re
-from typing import Tuple, List
 from app.config import settings
+
+from typing import Tuple, List, Optional, Dict, Any
+from datetime import datetime, timedelta
+from jose import jwt, JWTError # Requires python-jose
+from passlib.context import CryptContext # Requires passlib
 
 class SecurityService:
     def __init__(self):
         self.enabled = settings.security_enabled
         self.redact_pii = settings.pii_redaction_enabled
+
+        # ====================================================================
+        # AUTHENTICATION SETUP
+        # ====================================================================
+        self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        self.secret_key = settings.secret_key
+        self.algorithm = settings.jwt_algorithm
+        self.expire_minutes = settings.access_token_expire_minutes
 
         # 1. PII Regex Patterns
         self.pii_patterns = {
@@ -82,3 +94,43 @@ class SecurityService:
             return False, "Input exceeds safety length limits"
 
         return True, ""
+
+    # ========================================================================
+    #  PASSWORD & TOKEN MANAGEMENT
+    # ========================================================================
+
+    def verify_password(self, plain_password: str, hashed_password: str) -> bool:
+        """Verify a password against its hash."""
+        return self.pwd_context.verify(plain_password, hashed_password)
+
+    def get_password_hash(self, password: str) -> str:
+        """Generate password hash."""
+        return self.pwd_context.hash(password)
+
+    def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None) -> str:
+        """
+        Create a JWT access token.
+        Encodes user ID, role, and scopes.
+        """
+        to_encode = data.copy()
+
+        if expires_delta:
+            expire = datetime.utcnow() + expires_delta
+        else:
+            expire = datetime.utcnow() + timedelta(minutes=self.expire_minutes)
+
+        to_encode.update({"exp": expire})
+
+        encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
+        return encoded_jwt
+
+    def decode_token(self, token: str) -> Optional[Dict[str, Any]]:
+        """
+        Decode and validate a JWT token.
+        Returns payload dict if valid, None otherwise.
+        """
+        try:
+            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+            return payload
+        except JWTError:
+            return None

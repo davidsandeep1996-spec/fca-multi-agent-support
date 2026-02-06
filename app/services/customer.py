@@ -46,7 +46,10 @@ class CustomerService(BaseService):
         email: str,
         phone: str = None,
         account_number: str = None,
-        is_vip: bool = False
+        is_vip: bool = False,
+        hashed_password: str = None,
+        role: str = "user",
+        scopes: str = "read:accounts"
     ) -> Customer:
         """
         Create new customer.
@@ -87,6 +90,9 @@ class CustomerService(BaseService):
             "is_vip": is_vip,
             "is_active": True,
             "is_verified": False,
+            "hashed_password": hashed_password,
+            "role": role,
+            "scopes": scopes
         }
 
         customer = await self.repo.create(data)

@@ -26,6 +26,8 @@ from app.database import init_db, close_db
 from app.api.routes.messages import router as messages_router
 from app.routers.admin import router as admin_router
 
+from app.api.routes.auth import router as auth_router
+
 from prometheus_fastapi_instrumentator import Instrumentator
 
 # Import routers
@@ -242,6 +244,7 @@ def create_application() -> FastAPI:
         tags=["Health"],
     )
 
+    app.include_router(auth_router)
     app.include_router(messages_router)
     app.include_router(admin_router)
 

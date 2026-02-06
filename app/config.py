@@ -154,6 +154,19 @@ class Settings(BaseSettings):
         description="Redact PII from logs and database",
     )
     # ========================================================================
+    #  JWT AUTHENTICATION SETTINGS
+    # ========================================================================
+    jwt_algorithm: str = Field(
+        default="HS256",
+        description="Algorithm used for JWT token signing",
+    )
+
+    access_token_expire_minutes: int = Field(
+        default=30,
+        description="Time until access token expires",
+    )
+
+    # ========================================================================
     # RATE LIMITING SETTINGS
     # ========================================================================
 

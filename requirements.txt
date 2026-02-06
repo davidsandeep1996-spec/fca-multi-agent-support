@@ -264,3 +264,8 @@ zipp==3.23.0
     # via importlib-metadata
 zstandard==0.25.0
     # via langsmith
+
+passlib[bcrypt]
+bcrypt==3.2.2
+python-jose[cryptography]
+python-multipart
