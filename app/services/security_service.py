@@ -7,10 +7,16 @@ Acts as a middleware for safety guardrails.
 import re
 from app.config import settings
 
+import requests
+import logging
+
 from typing import Tuple, List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from jose import jwt, JWTError # Requires python-jose
 from passlib.context import CryptContext # Requires passlib
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 class SecurityService:
     def __init__(self):
@@ -24,6 +30,7 @@ class SecurityService:
         self.secret_key = settings.secret_key
         self.algorithm = settings.jwt_algorithm
         self.expire_minutes = settings.access_token_expire_minutes
+        self.lakera_guard_api_key = settings.lakera_guard_api_key
 
         # 1. PII Regex Patterns
         self.pii_patterns = {
@@ -74,6 +81,57 @@ class SecurityService:
 
         return sanitized
 
+
+    # ========================================================================
+    # NEW: LAKERA GUARD INTEGRATION
+    # ========================================================================
+    def _check_with_lakera(self, text: str) -> Tuple[bool, str]:
+        """
+        Query Lakera Guard API to detect prompt injections.
+
+        Returns:
+            (is_safe: bool, reason: str)
+        """
+# DEBUG 1: Check if key is loaded
+        if not self.lakera_guard_api_key:
+            print("❌ DEBUG: Lakera API Key is MISSING or Empty.")
+            return True, ""
+
+        print(f"✅ DEBUG: Key found (starts with {self.lakera_guard_api_key[:4]}...)")
+
+        try:
+            response = requests.post(
+                "https://api.lakera.ai/v2/guard",
+                headers={"Authorization": f"Bearer {self.lakera_guard_api_key}"},
+                json={
+                    "messages": [
+                        {"role": "user", "content": text}
+                    ]
+                }
+            )
+
+            # DEBUG 2: Print the raw response
+            print(f"📡 DEBUG: Lakera Status: {response.status_code}")
+            print(f"📡 DEBUG: Lakera Response: {response.text}")
+
+            if response.status_code != 200:
+                logger.warning(f"Lakera Guard API Warning: {response.status_code} - {response.text}")
+                return True, ""
+
+            result = response.json()
+            # [CHANGE 1a] Check the 'flagged' boolean in the response
+            if result.get("flagged") is True:
+                logger.info(f"Lakera Blocked Input: {result}")
+                return False, "Lakera Guard: Prompt Injection Detected"
+
+        except Exception as e:
+            logger.error(f"Lakera Guard API Error: {e}")
+            # Fail open (allow) if external service is down, but log error
+            # Or fail closed (return False) depending on security policy
+            return True, ""
+
+        return True, ""
+
     def check_jailbreak(self, text: str) -> Tuple[bool, str]:
         """
         Check for prompt injection attempts.
@@ -82,6 +140,11 @@ class SecurityService:
         if not self.enabled:
             return True, ""
 
+        # 1. Check External Guardrail (Lakera) FIRST
+        # This provides advanced AI-based detection before falling back to heuristics
+        is_safe, reason = self._check_with_lakera(text)
+        if not is_safe:
+            return False, reason
         text_lower = text.lower()
 
         # 1. Heuristic Check (Fast)

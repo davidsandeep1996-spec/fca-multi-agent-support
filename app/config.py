@@ -149,6 +149,14 @@ class Settings(BaseSettings):
         description="Threshold for jailbreak detection (higher = stricter)",
     )
 
+    # ========================================================================
+    # [CHANGE 1a] NEW: PROMPT INJECTION DEFENSE SETTINGS
+    # ========================================================================
+    lakera_guard_api_key: Optional[str] = Field(
+        default=None,
+        description="API Key for Lakera Guard (Advanced Prompt Injection Defense)",
+    )
+
     pii_redaction_enabled: bool = Field(
         default=True,
         description="Redact PII from logs and database",
@@ -162,7 +170,7 @@ class Settings(BaseSettings):
     )
 
     access_token_expire_minutes: int = Field(
-        default=30,
+        default=3000,
         description="Time until access token expires",
     )
 
