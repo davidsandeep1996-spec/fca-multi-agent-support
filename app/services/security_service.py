@@ -15,6 +15,11 @@ from datetime import datetime, timedelta
 from jose import jwt, JWTError # Requires python-jose
 from passlib.context import CryptContext # Requires passlib
 
+
+#  Import Presidio Engines
+from presidio_analyzer import AnalyzerEngine
+from presidio_anonymizer import AnonymizerEngine
+
 # Setup logger
 logger = logging.getLogger(__name__)
 
@@ -22,6 +27,20 @@ class SecurityService:
     def __init__(self):
         self.enabled = settings.security_enabled
         self.redact_pii = settings.pii_redaction_enabled
+
+        # We wrap in try/except in case the Spacy model isn't downloaded locally
+        try:
+            if self.redact_pii:
+                self.analyzer = AnalyzerEngine()
+                self.anonymizer = AnonymizerEngine()
+                logger.info("✅ Presidio PII Engine Initialized")
+            else:
+                self.analyzer = None
+                self.anonymizer = None
+        except Exception as e:
+            logger.warning(f"⚠️ Presidio Init Failed (Ensure 'en_core_web_lg' is installed): {e}")
+            self.analyzer = None
+            self.anonymizer = None
 
         # ====================================================================
         # AUTHENTICATION SETUP
@@ -31,6 +50,8 @@ class SecurityService:
         self.algorithm = settings.jwt_algorithm
         self.expire_minutes = settings.access_token_expire_minutes
         self.lakera_guard_api_key = settings.lakera_guard_api_key
+
+
 
         # 1. PII Regex Patterns
         self.pii_patterns = {
@@ -75,11 +96,53 @@ class SecurityService:
         if not self.enabled or not self.redact_pii:
             return text
 
+        #  Switch to Presidio Engine
+        if self.analyzer:
+            return self._redact_with_presidio(text)
+
         sanitized = text
         for label, pattern in self.pii_patterns.items():
             sanitized = re.sub(pattern, f"[{label}_REDACTED]", sanitized)
 
         return sanitized
+
+    # ========================================================================
+    #  PRESIDIO REDACTION LOGIC
+    # ========================================================================
+    def _redact_with_presidio(self, text: str) -> str:
+        """
+        Uses Microsoft Presidio to detect and redact PII entities.
+        Entities: PERSON, EMAIL_ADDRESS, PHONE_NUMBER, CREDIT_CARD, etc.
+        """
+        if not self.analyzer or not self.anonymizer:
+            return text
+
+        try:
+            # 1. Analyze (Detect)
+            results = self.analyzer.analyze(
+                text=text,
+                entities=["PHONE_NUMBER", "EMAIL_ADDRESS", "CREDIT_CARD", "IBAN_CODE", "US_BANK_NUMBER", "PERSON"],
+                language='en'
+            )
+
+            from presidio_anonymizer.entities import OperatorConfig
+
+            anonymized_result = self.anonymizer.anonymize(
+                text=text,
+                analyzer_results=results,
+                operators={
+                    "DEFAULT": OperatorConfig("replace", {"new_value": "[CONFIDENTIAL_DATA]"}),
+                    "EMAIL_ADDRESS": OperatorConfig("replace", {"new_value": "[EMAIL]"}),
+                    "PHONE_NUMBER": OperatorConfig("replace", {"new_value": "[PHONE]"}),
+                    "PERSON": OperatorConfig("replace", {"new_value": "[NAME]"})
+                }
+            )
+
+            return anonymized_result.text
+
+        except Exception as e:
+            logger.error(f"Presidio Redaction Error: {e}")
+            return text
 
 
     # ========================================================================
@@ -140,11 +203,13 @@ class SecurityService:
         if not self.enabled:
             return True, ""
 
+        sanitized_text_for_check = self.sanitize_input(text)
+
         # 1. Check External Guardrail (Lakera) FIRST
         # This provides advanced AI-based detection before falling back to heuristics
-        is_safe, reason = self._check_with_lakera(text)
+        is_safe, reason = self._check_with_lakera(sanitized_text_for_check)
         if not is_safe:
-            return False, reason
+             return False, reason
         text_lower = text.lower()
 
         # 1. Heuristic Check (Fast)
