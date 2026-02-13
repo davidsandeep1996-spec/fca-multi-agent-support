@@ -50,7 +50,20 @@ class GeneralAgent(BaseAgent):
                 return await self.client.chat.completions.create(
                     model=self.config.model_name,
                     messages=[
-                        {"role": "system", "content": "You are a helpful banking assistant."},
+                        {"role": "system", "content": ("You are a helpful banking assistant.\n"
+                                                       "You may receive a 'CONVERSATION HISTORY' block before the user's message.\n"
+                            "If the user asks 'What did I say?', refer to that history.\n"
+                            "NOTE: User input may be sanitized for privacy. \n"
+                            "If you see tokens like [NAME], [EMAIL], or [PHONE], do NOT repeat them as if they are real values.\n"
+                            "Instead, acknowledge the information was received but protected (e.g., 'Nice to meet you, I've noted your details safely').\n"
+                            "Do NOT invent information not in the history."
+                            "PRIVACY RULE: User data is sanitized. You will see tokens like [NAME], [EMAIL].\n"
+                            "When referring to them, ALWAYS replace the token with a generic phrase like 'your name' or 'the details you provided'.\n"
+                            "EXAMPLE:\n"
+                            "Bad: 'Your name is [NAME]'\n"
+                            "Good: 'I see you provided your name.'\n"
+                            "Use the CONVERSATION HISTORY to answer context questions.")
+                        },
                         {"role": "user", "content": message}
                     ],
                     temperature=0.7

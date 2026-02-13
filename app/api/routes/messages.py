@@ -123,7 +123,8 @@ async def process_message(request: MessageRequest, current_user: Customer = Secu
     """
     try:
         if request.customer_id != current_user.id:
-             logger.warning(f"ID Mismatch: Token={current_user.id}, Request={request.customer_id}")
+             logger.critical(f"ID Mismatch: Token={current_user.id}, Request={request.customer_id}")
+             raise HTTPException(status_code=403, detail=f"Access Denied: You cannot access customer {request.customer_id}'s data.")
              # We allow it for now for testing, or you can raise 403
         logger.info(f"Processing message for customer {request.customer_id}")
 
@@ -163,8 +164,8 @@ async def process_message(request: MessageRequest, current_user: Customer = Secu
         logger.error(f"Validation error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Processing error: {e}")
-        raise HTTPException(status_code=500, detail="Error processing message")
+        logger.error(f"Processing error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error processing message: {str(e)}")
 
 
 # ============================================================================

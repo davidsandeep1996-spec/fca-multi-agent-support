@@ -27,10 +27,12 @@ class ProductRecommenderAgent(BaseAgent):
         message = input_data.get("message", "")
         customer_profile = context.get("customer", {}) if context else {}
 
+        history = context.get("conversation_history", []) if context else []
+
         try:
             async with self.product_service as service:
 
-                recommendations = await self._generate_recommendations(service,intent, message, customer_profile)
+                recommendations = await self._generate_recommendations(service,intent, message, customer_profile, history)
 
             response = self.create_response(
                 content=recommendations["response_text"],
@@ -52,7 +54,7 @@ class ProductRecommenderAgent(BaseAgent):
             )
     #  Decorate this helper as a 'generation' to capture LLM inputs/outputs
     @observe(as_type="generation", name="Groq-Product-Recs")
-    async def _generate_recommendations(self, service: ProductService, intent: str, message: str, customer_profile: Dict[str, Any]) -> Dict[str, Any]:
+    async def _generate_recommendations(self, service: ProductService, intent: str, message: str, customer_profile: Dict[str, Any], history: List[Dict[str, Any]]) -> Dict[str, Any]:
         # 1. Update trace with model params
         langfuse = get_client()
         langfuse.update_current_generation(
@@ -75,7 +77,7 @@ class ProductRecommenderAgent(BaseAgent):
              }
 
         # 3. Build Prompt & Call LLM
-        prompt = self._build_recommendation_prompt(intent, message, customer_profile, available_products)
+        prompt = self._build_recommendation_prompt(intent, message, customer_profile, available_products, history)
 
         # ADDED: Manually track generation
 
@@ -121,9 +123,16 @@ class ProductRecommenderAgent(BaseAgent):
         }
         return intent_to_db_type.get(intent, "savings")
 
-    def _build_recommendation_prompt(self, intent: str, message: str, customer_profile: Dict[str, Any], available_products: List[Any]) -> str:
+    def _build_recommendation_prompt(self, intent: str, message: str, customer_profile: Dict[str, Any], available_products: List[Any], history: List[Dict[str, Any]]) -> str:
+
+        # Format history string
+        history_str = ""
+        if history:
+             history_str = "RECENT CONVERSATION:\n" + "\n".join(
+                [f"- {msg.get('role', 'unknown')}: {msg.get('content', '')}" for msg in history[-5:]]
+             )
         products_text = ""
-        for p in available_products:
+        for i, p in enumerate(available_products, 1):
             features = ", ".join(p.features) if p.features else "Standard features"
             rate = f"{p.interest_rate}%" if p.interest_rate is not None else "Variable"
             products_text += (
@@ -132,16 +141,38 @@ class ProductRecommenderAgent(BaseAgent):
                 f"Interest Rate: {rate}\n"
                 f"Features: {features}\n\n"
             )
+            products_text += f"{i}. Product: {p.name}...\n"
 
         is_vip = customer_profile.get("is_vip", False) if customer_profile else False
         customer_text = f"\n\nCustomer Profile:\n- VIP Status: {'Yes' if is_vip else 'No'}"
 
-        return f"""Based on the customer's needs, recommend the most suitable financial products.
+        return f"""You are a financial product expert.
+        Based on the customer's needs, recommend the most suitable financial products.
+RECENT CONVERSATION:
+        {history_str}
 Customer Intent: {intent}
-Customer Message: "{message}"{customer_text}
+CURRENT REQUEST: "{message}"{customer_text}
 
 Available Products (from Database):
 {products_text}
+
+TASK:
+1. IF the user is asking a specific question about a product (e.g., "Is it guaranteed?", "Tell me more about the first one", "What are the rates?"):
+   - Identify the specific product they are referring to from the History or the Message.
+   - Answer their question DIRECTLY using the product details.
+   - Do NOT just list the products again.
+   - [CRITICAL] COMPLIANCE RULE: If the user asks if a loan is "Guaranteed", you MUST say "No loan is guaranteed. Approval is subject to status and credit checks." You can mention the *rate* is fixed, but never imply approval is guaranteed.
+   - FORMAT: "ANSWER: <Your detailed answer>"
+
+2. IF the user is asking for suggestions (e.g., "I need a loan", "What do you have?"):
+   - Recommend the best matching products from the list above.
+   - FORMAT:
+     RECOMMENDED PRODUCTS: <names>
+     REASONING: <why>
+     KEY BENEFITS: <bullets>
+     NEXT STEPS: <action>
+
+IMPORTANT: If the user asks about a specific product mentioned previously (e.g., "the second one", "the tracker"), use the History and the Numbered List above to identify it.
 
 Provide recommendations in this format:
 RECOMMENDED PRODUCTS: <comma-separated product names>
@@ -155,6 +186,18 @@ CONFIDENCE: <0.0-1.0>
         return "You are a financial product recommendation specialist for a UK bank (FCA regulated). Recommend suitable products, explain benefits clearly, and include risks."
 
     def _parse_recommendation_response(self, response_text: str, available_products: List[Any]) -> Dict[str, Any]:
+
+
+        if "ANSWER:" in response_text:
+            answer_text = response_text.split("ANSWER:", 1)[1].strip()
+            return {
+                "response_text": answer_text,
+                "products": [], # No specific list needed for Q&A
+                "reasoning": "Direct Q&A",
+                "disclaimers": [], # Compliance checker will add them if needed
+                "confidence": 1.0
+            }
+
         recommended_names = []
         reasoning = ""
         key_benefits = ""

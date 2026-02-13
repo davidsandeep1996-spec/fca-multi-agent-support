@@ -174,8 +174,27 @@ class AgentCoordinator:
 
         conv_context = self.get_or_create_conversation(customer_id, conversation_id)
 
-        history = conv_context.get_llm_history(limit_turns=5)
+        # Fetch robust history from Database (Persists across restarts)
+        db_history = await self.get_db_conversation_history(conversation_id, limit=15)
 
+        # Format for LangChain/LangGraph (Needs "role" and "content")
+        history = []
+        if db_history:
+            for msg in db_history:
+                # Ensure dictionary access is safe
+                if isinstance(msg, dict):
+                    role_raw = msg.get("role", "user")
+                    content = msg.get("content", "")
+                else:
+                    # Fallback if it's an object
+                    role_raw = getattr(msg, "role", "user")
+                    content = getattr(msg, "content", "")
+                # Map 'customer' -> 'user' for the LLM
+                role = "user" if role_raw in ["customer", "user"] else "assistant"
+                history.append({
+                    "role": role,
+                    "content": content
+                })
         if context is None:
             context = {}
 
@@ -552,6 +571,10 @@ class AgentCoordinator:
                 # Handle potential Enum or String for role
                 role_str = msg.role.value if hasattr(msg.role, 'value') else str(msg.role)
 
+                # Normalization (optional but recommended)
+                if role_str == "customer":
+                    role_str = "user"
+
                 history.append({
                     "id": msg.id,
                     "role": role_str,
@@ -580,7 +603,7 @@ class AgentCoordinator:
                     "status": c.status.value if hasattr(c.status, 'value') else str(c.status),
                     "created_at": c.created_at.isoformat(),
                     "message_count": c.message_count,
-                    "last_updated": c.updated_at.isoformat()
+                    "last_updated": c.updated_at.isoformat() if c.updated_at else ""
                 }
                 for c in conversations
             ]

@@ -33,6 +33,9 @@ class IntentClassifierAgent(BaseAgent):
                 "I want to apply for a mortgage",
                 "What are your loan interest rates?",
                 "Can I get a personal loan?",
+                "Is the loan guaranteed?",
+                "Tell me more about that product",
+                "What are the terms for the first option?"
             ],
             "routing": "product_recommender",
         },
@@ -81,6 +84,10 @@ class IntentClassifierAgent(BaseAgent):
                 "How do I get help?",
                 "What are your support hours?",
                 "How do I reach customer service?",
+                "What did I ask you before?",
+                "Did I mention my name?",
+                "What was the last thing I said?",
+                "Did I ask about my balance earlier?"
             ],
             "routing": "general_agent",
         },
@@ -117,6 +124,15 @@ class IntentClassifierAgent(BaseAgent):
             "Multi-language support",
             "Context-aware classification",
         ]
+
+
+    def _limit_history_context(self, context: Optional[Dict[str, Any]], max_turns: int = 2) -> List[Dict[str, str]]:
+        """Helper to limit history to prevent LLM confusion."""
+        if context and "conversation_history" in context:
+            history = context["conversation_history"]
+            if history:
+                return history[-max_turns:]
+        return []
 
     # ========================================================================
     # CORE PROCESSING
@@ -244,14 +260,13 @@ class IntentClassifierAgent(BaseAgent):
 
 """
         # [NEW] Inject History
-        if context and "conversation_history" in context:
-            history_list = context["conversation_history"]
-            if history_list:
-                history_str = "\n".join([
-                    f"{msg['role'].upper()}: {msg['content']}"
-                    for msg in history_list
-                ])
-                prompt += f"PREVIOUS CONVERSATION:\n{history_str}\n\n"
+        recent_history = self._limit_history_context(context, max_turns=2)
+        if recent_history:
+            history_str = "\n".join([
+                f"{msg['role'].upper()}: {msg['content']}"
+                for msg in recent_history
+            ])
+            prompt += f"PREVIOUS CONVERSATION:\n{history_str}\n\n"
 
         prompt += f"""CURRENT CUSTOMER MESSAGE: "{message}"
 
@@ -278,7 +293,9 @@ Guidelines:
 - Consider context from conversation history
 - Detect sentiment (positive, neutral, negative)
 - Provide clear explanations
-- Use the exact format requested"""
+- Use the exact format requested
+- SPECIAL RULE: If a user asks about their *past* conversation (e.g., "What did I just say?"), classify as 'general_inquiry', NOT the topic they are asking about.
+"""
 
     def _parse_llm_response(self, response_text: str) -> Dict[str, Any]:
         """

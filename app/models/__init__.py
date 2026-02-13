@@ -25,15 +25,15 @@ class TimestampMixin:
 
     created_at = Column(
         DateTime(timezone=True),
-        default=datetime.now(timezone.utc),
+        default=lambda: datetime.now(timezone.utc),
         nullable=False,
         comment="Record creation timestamp (UTC)",
     )
 
     updated_at = Column(
         DateTime(timezone=True),
-        default=datetime.now(timezone.utc),
-        onupdate=datetime.now(timezone.utc),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
         comment="Record last update timestamp (UTC)",
     )

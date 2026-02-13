@@ -100,6 +100,16 @@ class ComplianceCheckerAgent(BaseAgent):
             "Regulatory guidance",
         ]
 
+    def _filter_contextual_false_positives(self, content_lower: str, issues: List[str]) -> List[str]:
+        """Helper to remove false positives like 'not guaranteed'."""
+        filtered = []
+        for issue in issues:
+            # Ignore if the bot explicitly said it is NOT guaranteed
+            if "guaranteed" in issue and ("not guaranteed" in content_lower or "no loan is guaranteed" in content_lower):
+                continue
+            filtered.append(issue)
+        return filtered
+
     # ========================================================================
     # CORE PROCESSING
     # ========================================================================
@@ -229,7 +239,8 @@ class ComplianceCheckerAgent(BaseAgent):
                     f"FCA requires balanced, not misleading information."
                 )
 
-        return issues
+        return self._filter_contextual_false_positives(content_lower, issues)
+    
     @observe(as_type="generation", name="Groq-Compliance-Check")
     async def _llm_compliance_check(
         self,

@@ -36,7 +36,13 @@ class AccountAgent(BaseAgent):
             "Natural language account information",
         ]
 
-    
+    def _extract_clean_message(self, message: str) -> str:
+        """Helper to strip history context from message for accurate intent matching."""
+        clean = message.lower()
+        if "current user message:" in clean:
+            clean = clean.split("current user message:")[-1]
+        return clean.strip()
+
     @observe(name="AccountAgent")
     async def process(
         self,
@@ -80,7 +86,7 @@ class AccountAgent(BaseAgent):
             )
 
     def _determine_query_type(self, message: str) -> str:
-        message_lower = message.lower()
+        message_lower = self._extract_clean_message(message)
         if any(word in message_lower for word in ["balance", "how much", "account total", "have"]):
             return "balance"
         elif any(word in message_lower for word in ["transaction", "history", "recent", "activity"]):
