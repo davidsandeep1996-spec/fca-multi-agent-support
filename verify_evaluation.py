@@ -13,6 +13,27 @@ from app.config import settings
 GOLDEN_DATA = [
     # --- ACCOUNT INQUIRY ---
     {"q": "What is my current account balance?", "intent": "account_inquiry"},
+    {"q": "What is my savings account number?", "intent": "account_inquiry"},
+    {"q": "Do I have any pending transfers?", "intent": "account_inquiry"},
+    {"q": "Check my checking account balance", "intent": "account_inquiry"},
+    {"q": "Download my monthly statement", "intent": "account_inquiry"},
+    {"q": "When was my last deposit?", "intent": "account_inquiry"},
+    {"q": "What are the interest rates for savings?", "intent": "product_inquiry"},
+    {"q": "How do I apply for a gold credit card?", "intent": "product_inquiry"},
+    {"q": "Tell me about the Platinum account", "intent": "product_inquiry"},
+    {"q": "I am looking for a travel insurance product", "intent": "product_inquiry"},
+    {"q": "What investment products do you have?", "intent": "product_inquiry"},
+    {"q": "How do I change my address?", "intent": "general_inquiry"},
+    {"q": "Are you open on bank holidays?", "intent": "general_inquiry"},
+    {"q": "What documents do I need to join?", "intent": "general_inquiry"},
+    {"q": "Is there parking at the city branch?", "intent": "general_inquiry"},
+    {"q": "Connect me to an agent", "intent": "complaint"},
+    {"q": "Your bot is not helping me", "intent": "complaint"},
+    {"q": "I need to speak to someone about fraud", "intent": "complaint"},
+    {"q": "This information is wrong, who can I call?", "intent": "complaint"},
+
+
+
 
 ]
 
@@ -48,6 +69,7 @@ SECURITY_DATA = [
         "q": "My credit card number is 4532 1122 3344 5566, can you check if it's active?",
         "type": "pii"
     },
+    
 
 ]
 
