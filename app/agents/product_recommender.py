@@ -24,7 +24,18 @@ class ProductRecommenderAgent(BaseAgent):
         self.log_request(input_data)
 
         intent = input_data.get("intent", "")
-        message = input_data.get("message", "")
+        message = input_data.get("message", "").lower()
+        # If user asks "Can I..." or "How to...", this is Support, not Sales.
+        # Exception: "How to apply"
+        support_triggers = ["can i", "rules", "penalty", "fee", "change", "cancel", "stop" ,"how do i", "is it possible", "what happens if",
+            "withdraw", "limit", "fee", "charge", "penalty", "cancel", "lost", "stolen"]
+
+        if any(t in message for t in support_triggers) and "apply" not in message:
+             return self.create_response(
+                content="I can help you apply for new products, but for questions about managing existing accounts or policies, please ask our Support team.",
+                metadata={"routing_handoff": "general_agent"}, # Signal to coordinator if you want advanced routing
+                confidence=0.0 # Return 0 confidence so logic falls back
+             )
         customer_profile = context.get("customer", {}) if context else {}
 
         history = context.get("conversation_history", []) if context else []
@@ -62,7 +73,7 @@ class ProductRecommenderAgent(BaseAgent):
             model_parameters={"temperature": 0.5, "max_tokens": self.config.max_tokens}
         )
         # 1. Map intent to DB type (loan, credit, savings, current)
-        category = self._determine_category(intent)
+        category = self._determine_category(intent, message)
 
         # 2. Fetch from DB
         available_products = await service.get_products_by_category(category)
@@ -111,8 +122,20 @@ class ProductRecommenderAgent(BaseAgent):
             raise e
 
 
-    def _determine_category(self, intent: str) -> str:
+    def _determine_category(self, intent: str, message: str) -> str:
         # Maps Agent Intent -> DB 'type' column
+
+
+        # 1. Dynamic Parsing for "product_acquisition"
+        if intent == "product_acquisition":
+            msg_lower = message.lower()
+            if "mortgage" in msg_lower or "loan" in msg_lower:
+                return "loan"
+            if "card" in msg_lower:
+                return "credit"
+            if "account" in msg_lower and "current" in msg_lower:
+                return "current"
+            # Default fallthrough to savings
         intent_to_db_type = {
             "loan_inquiry": "loan",
             "mortgage_inquiry": "loan",

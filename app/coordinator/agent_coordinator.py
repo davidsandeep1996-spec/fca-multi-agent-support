@@ -15,6 +15,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from app.services.security_service import SecurityService
 
 from app.workflows.message_workflow import MessageWorkflow
+from app.services.rag_service import RAGService
 from app.database import AsyncSessionLocal
 from app.services import (
             AccountService,
@@ -139,6 +140,8 @@ class AgentCoordinator:
         self.transaction_service = TransactionService()
         self.faq_service = FAQService()
 
+
+
         self.checkpointer = MemorySaver()
 
 
@@ -245,6 +248,7 @@ class AgentCoordinator:
                 product_service=ProductService(db=session),
                 conversation_service=ConversationService(db=session),
                 faq_service=FAQService(db=session),
+                rag_service=RAGService(),
                 checkpointer=self.checkpointer
             )
 
@@ -471,8 +475,9 @@ class AgentCoordinator:
                 transaction_service=transaction_svc,
                 product_service=product_svc,
                 conversation_service=conversation_svc,
-                faq_service=faq_svc
-            )
+                faq_service=faq_svc,
+                rag_service=RAGService(),
+                )
 
             # Update Context
             context.update({

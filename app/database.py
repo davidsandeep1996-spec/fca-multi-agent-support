@@ -103,13 +103,15 @@ async def init_db() -> None:
     Note: In production, use Alembic migrations instead.
     This is for development/testing only.
     """
+async def init_db() -> None:
+    """
+    Initialize database tables and extensions.
+    """
     async with engine.begin() as conn:
-        # Drop all tables (development only!)
-        #if settings.is_development:
-        #    logger.warning("Dropping all database tables (development mode)")
-        #    await conn.run_sync(Base.metadata.drop_all)
+        logger.info("Enabling pgvector extension")
+        # [NEW] This MUST run before table creation to support Vector columns
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
 
-        # Create all tables
         logger.info("Creating database tables")
         await conn.run_sync(Base.metadata.create_all)
         logger.info("Database tables created successfully")

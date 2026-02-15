@@ -20,6 +20,7 @@ from app.agents.general_agent import GeneralAgent
 from app.agents.human_agent import HumanAgent
 from app.agents.product_recommender import ProductRecommenderAgent
 from app.agents.compliance_checker import ComplianceCheckerAgent
+
 from app.services import (
     AccountService,
     CustomerService,
@@ -47,7 +48,7 @@ class MessageWorkflow:
     3. Response formatting
     """
 
-    def __init__(self, *, account_service, customer_service, transaction_service, product_service, conversation_service, faq_service, checkpointer=None):
+    def __init__(self, *, account_service, customer_service, transaction_service, product_service, conversation_service, faq_service, rag_service=None, checkpointer=None):
         self.intent_classifier = IntentClassifierAgent()
         self.account_agent = AccountAgent(
             account_service=account_service,
@@ -55,7 +56,7 @@ class MessageWorkflow:
             transaction_service=transaction_service,
             faq_service=faq_service
         )
-        self.general_agent = GeneralAgent(faq_service=faq_service)
+        self.general_agent = GeneralAgent(faq_service=faq_service, rag_service=rag_service)
         self.product_agent = ProductRecommenderAgent(product_service=product_service)
         self.compliance_agent = ComplianceCheckerAgent()
         self.human_agent = HumanAgent(conversation_service=conversation_service)
@@ -215,16 +216,13 @@ class MessageWorkflow:
         # 1. READ from State
         message = state.message
 
-        # [CHANGE] Force-feed history into the message string
-        history_context = self._format_history_for_llm(state.history)
-        full_prompt = f"{history_context}CURRENT USER MESSAGE: {message}"
 
 
         # customer_id = state.customer_id (not needed for classification logic, but available)
 
         # 2. PROCESS
         classification = await self.intent_classifier.process({
-            "message": full_prompt,
+            "message": message,
         },context={"conversation_history": state.history})
 
         intent = classification.metadata.get("intent", "general_inquiry")
@@ -274,13 +272,9 @@ class MessageWorkflow:
         # 1. READ from State
         message = state.message
 
-        # [CHANGE] Force-feed history into the message string
-        history_context = self._format_history_for_llm(state.history)
-        full_prompt = f"{history_context}CURRENT USER MESSAGE: {message}"
-
         # 2. PROCESS
         response = await self.general_agent.process({
-            "message": full_prompt,
+            "message": message,
         },context={"conversation_history": state.history})
 
         self.logger.info(f"✅ General inquiry handled: {response.metadata.get('source')}")
@@ -302,14 +296,11 @@ class MessageWorkflow:
         customer_id = state.customer_id
         intent = state.intent
 
-            # [CHANGE] Force-feed history into the message string
-        history_context = self._format_history_for_llm(state.history)
-        full_prompt = f"{history_context}CURRENT USER MESSAGE: {message}"
 
         # 2. PROCESS
         response = await self.product_agent.process({
             "customer_id": customer_id,
-            "message": full_prompt,
+            "message": message,
             "intent": intent,
         },context={"conversation_history": state.history})
 
@@ -454,9 +445,11 @@ class MessageWorkflow:
         intent = state.intent or "general_inquiry"
 
         intent_map = {
-            "account_inquiry": "account",
+            "account_data": "account",
             "general_inquiry": "general",
-            "loan_inquiry": "product",
+            "knowledge_inquiry": "general",
+
+            "product_acquisition": "product",
             "credit_card": "product",
             "complaint": "complaint",
         }

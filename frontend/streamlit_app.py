@@ -249,7 +249,7 @@ if not st.session_state.token:
 
         with st.form("login_form"):
             # Default test credentials pre-filled for convenience
-            uid = st.text_input("Email / User ID", value="yellis@example.org")
+            uid = st.text_input("Email / User ID", value="wthomas@example.org")
             pwd = st.text_input("Password", type="password", value="password123")
 
             submitted = st.form_submit_button("Secure Login 🔒")
@@ -337,7 +337,7 @@ if prompt := st.chat_input("How can I help you today?"):
                 f"{API_BASE_URL}/messages/process",
                 headers=headers,
                 json=payload,
-                timeout=30
+                timeout=120
             )
 
             if response.status_code == 200:

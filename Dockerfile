@@ -31,8 +31,14 @@ FROM base as dependencies
 # Copy requirements
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# 1. Upgrade pip
+RUN pip install --upgrade pip
+
+# 2. [CRITICAL FIX] Force install the lightweight CPU-only version of PyTorch FIRST
+RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+# 3. Install the rest of your requirements with a massively extended timeout
+RUN pip install --no-cache-dir --default-timeout=1000 -r requirements.txt
 
 # Download Spacy NLP model for Presidio (Required for PII detection)
 RUN pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.7.1/en_core_web_lg-3.7.1-py3-none-any.whl

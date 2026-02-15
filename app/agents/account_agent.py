@@ -43,6 +43,38 @@ class AccountAgent(BaseAgent):
             clean = clean.split("current user message:")[-1]
         return clean.strip()
 
+    def _format_currency(self, amount: float) -> str:
+        """Format number as GBP currency (e.g., £2,500.00)."""
+        return f"£{amount:,.2f}"
+
+    def _friendly_account_type(self, acct_type: Any) -> str:
+        """Map database Enum values to professional banking names."""
+        # Convert Enum or string to lowercase string key
+        key = str(acct_type).lower().split('.')[-1] if acct_type else ""
+
+        mapping = {
+            "current": "Standard Current Account",
+            "savings": "High-Yield Savings",
+            "loan": "Personal Loan",
+            "credit": "Platinum Credit Card",
+            "active": "Active",
+            "frozen": "Frozen",
+            "closed": "Closed"
+        }
+        return mapping.get(key, "General Account")
+
+    def _friendly_date(self, date_val: Any) -> str:
+        """Format dates nicely (e.g., '14 Feb 2026')."""
+        if not date_val:
+            return "N/A"
+        if isinstance(date_val, str):
+            try:
+                # Attempt to parse ISO string
+                date_val = datetime.fromisoformat(date_val.replace('Z', '+00:00'))
+            except:
+                return date_val
+        return date_val.strftime("%d %b %Y")
+
     @observe(name="AccountAgent")
     async def process(
         self,
@@ -86,7 +118,27 @@ class AccountAgent(BaseAgent):
             )
 
     def _determine_query_type(self, message: str) -> str:
+
+
         message_lower = self._extract_clean_message(message)
+
+
+        # These words imply the user wants to know a RULE, not a NUMBER.
+        policy_triggers = [
+            "can i", "may i", "allowed to", "rules", "policy", "limit",
+            "fee", "charge", "penalty", "interest rate", "terms",
+            "overpay", "close", "open", "switch", "transfer limit",
+            "how do i", "procedure"
+        ]
+
+        # If it contains a policy trigger, kick it to 'general' (RAG)
+        # UNLESS it is a direct data request like "What is my overdraft limit?"
+        if any(trigger in message_lower for trigger in policy_triggers):
+             # Exception: Keep it if they explicitly ask for their specific balance/limit value
+             if "balance" not in message_lower and "available" not in message_lower:
+                 return "general"
+
+
         if any(word in message_lower for word in ["balance", "how much", "account total", "have"]):
             return "balance"
         elif any(word in message_lower for word in ["transaction", "history", "recent", "activity"]):
@@ -147,11 +199,14 @@ class AccountAgent(BaseAgent):
                 acct_type = getattr(acct, "type", None)
                 balance = float(getattr(acct, "balance", 0.0) or 0.0)
 
+                friendly_type = self._friendly_account_type(acct_type)
+                formatted_bal = self._format_currency(balance)
+
                 response = (
-                    f"Your current account balance is {balance:,.2f}.\n\n"
-                    f"Account: {acct_num or 'N/A'}\n"
-                    f"Account Type: {acct_type or 'N/A'}\n"
-                    f"Last Updated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}"
+                    f"Your **{friendly_type}** balance is **{formatted_bal}**.\n\n"
+                    f"**Account Details:**\n"
+                    f"• Number: `{acct_num}`\n"
+                    f"• Status: Active"
                 )
 
                 return {
@@ -171,16 +226,20 @@ class AccountAgent(BaseAgent):
                     return {"response": "Account record missing id", "data": {}, "data_points": []}
 
                 # Note: this service actually expects account_id (despite method name) in your codebase
-                transactions = await txn_svc.get_transactions_by_account(account_id, limit=10)
+                all_transactions = await txn_svc.get_transactions_by_account(account_id, limit=10)
+                transactions = all_transactions[:5]
 
-                response = "Your recent transactions (last 10):\n\n"
+                response = "Here are your 5 most recent transactions:\n\n"
                 for i, txn in enumerate(transactions, 1):
-                    response += (
-                        f"{i}. {getattr(txn, 'description', 'N/A')}\n"
-                        f" Amount: {float(getattr(txn, 'amount', 0.0) or 0.0):,.2f}\n"
-                        f" Date: {getattr(txn, 'transaction_date', 'N/A')}\n"
-                        f" Balance: {float(getattr(txn, 'balance_after', 0.0) or 0.0):,.2f}\n\n"
-                    )
+                    desc = getattr(txn, 'description', 'Transaction')
+                    amt = float(getattr(txn, 'amount', 0.0) or 0.0)
+                    date_obj = getattr(txn, 'date', None) or getattr(txn, 'transaction_date', None)
+
+                    date_str = self._friendly_date(date_obj)
+                    formatted_amt = self._format_currency(amt)
+
+                    # Format: 1. Starbucks (14 Feb) ... £4.50
+                    response += f"{i}. **{desc}**\n   {date_str} • {formatted_amt}\n"
 
                 return {
                     "response": response,
@@ -231,19 +290,18 @@ class AccountAgent(BaseAgent):
                 acct_type = getattr(acct, "type", None)
                 created_at = getattr(acct, "created_at", None)  # prefer created_at over created_date
 
-                response = (
-                    f"Account Details for Customer {customer_id}\n\n"
-                    f"Account Number: {acct_num or 'N/A'}\n"
-                    f"Account Type: {acct_type or 'N/A'}\n"
-                    f"Current Balance: {float(getattr(acct, 'balance', 0.0) or 0.0):,.2f}\n"
-                    f"Account Status: {getattr(acct, 'status', 'N/A')}\n"
-                    f"Created: {created_at or 'N/A'}\n"
-                    f"Last Updated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                    "Contact information on file:\n"
-                    f"Email: {getattr(customer, 'email', 'N/A')}\n"
-                    f"Phone: {getattr(customer, 'phone', 'N/A')}"
-                )
+                friendly_type = self._friendly_account_type(acct_type)
+                formatted_bal = self._format_currency(float(getattr(acct, 'balance', 0.0)))
+                status = self._friendly_account_type(getattr(acct, 'status', 'Active'))
+                open_date = self._friendly_date(created_at)
 
+                response = (
+                    f"Here is the summary for your **{friendly_type}**:\n\n"
+                    f"• **Account Number:** `{acct_num}`\n"
+                    f"• **Available Balance:** {formatted_bal}\n"
+                    f"• **Status:** {status}\n"
+                    f"• **Opened On:** {open_date}\n"
+                )
                 return {
                     "response": response,
                     "data": {

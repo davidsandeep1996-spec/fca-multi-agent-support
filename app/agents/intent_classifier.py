@@ -27,38 +27,53 @@ class IntentClassifierAgent(BaseAgent):
     # ========================================================================
 
     INTENTS = {
-        "loan_inquiry": {
-            "description": "Customer asking about loans (mortgage, personal, business)",
+        "product_acquisition": {
+            "description": "Customer wants to APPLY for a NEW loan, card, or account. NOT for questions about existing ones.",
             "examples": [
                 "I want to apply for a mortgage",
                 "What are your loan interest rates?",
                 "Can I get a personal loan?",
                 "Is the loan guaranteed?",
                 "Tell me more about that product",
-                "What are the terms for the first option?"
+                "What are the terms for the first option?",
+                "What are your rates for new customers?"
             ],
             "routing": "product_recommender",
         },
-        "account_inquiry": {
-            "description": "Questions about EXISTING account details (balance, transactions, statements)",
+        "account_data": {
+            "description": "Fetching SPECIFIC numerical data about the user's existing account (Balance, Transactions, Dates).",
             "examples": [
                 "What is my account balance?",
                 "Show me my recent transactions",
                 "I need a bank statement",
                 "What's my transaction history?",
                 "How much can I spend?",
+                "How much money do I have?",
             ],
             "routing": "account_agent",
         },
-        "credit_card": {
-            "description": "Credit card related queries",
+        "knowledge_inquiry": {
+            "description": "Questions about POLICIES, RULES, FEES, LIMITS, or 'HOW TO'. General banking knowledge.",
             "examples": [
-                "I want to apply for a credit card",
-                "What credit cards do you offer?",
-                "Increase my credit limit",
+                "Can I overpay my mortgage?",
+                "What is the fee for CHAPS?",
+                "How do I close my account?",
+                "Is Open Banking safe?",
+                "What are the rules for overdrafts?",
+                "What is the daily limit?",
+                "How do I open an account?",
+                "How do I contact support?",
+                "What services do you offer?",
+                "Can I withdraw cash using my credit card?",
+                "How can I create a new account?",
+                "How do I get help?",
+                "What are your support hours?",
+                "What is the daily limit?",
+                "How do I reach customer service?",
             ],
-            "routing": "product_recommender",
+            "routing": "general_agent", # Routes to RAG
         },
+
         "complaint": {
             "description": "Customer complaints or issues",
             "examples": [
@@ -75,20 +90,8 @@ class IntentClassifierAgent(BaseAgent):
             "routing": "human_agent",
         },
         "general_inquiry": {
-            "description": "General questions, FAQs, how-to questions, or help/support contact requests",
-            "examples": [
-                "How do I open an account?",
-                "How do I contact support?",
-                "What services do you offer?",
-                "How can I create a new account?",
-                "How do I get help?",
-                "What are your support hours?",
-                "How do I reach customer service?",
-                "What did I ask you before?",
-                "Did I mention my name?",
-                "What was the last thing I said?",
-                "Did I ask about my balance earlier?"
-            ],
+            "description": "Greetings, vague help requests, or conversation history checks.",
+            "examples": ["Hello", "Hi", "Thank you", "Who are you?", "What did I just say?"],
             "routing": "general_agent",
         },
     }
@@ -295,6 +298,18 @@ Guidelines:
 - Provide clear explanations
 - Use the exact format requested
 - SPECIAL RULE: If a user asks about their *past* conversation (e.g., "What did I just say?"), classify as 'general_inquiry', NOT the topic they are asking about.
+
+CRITICAL ROUTING RULES:
+1. **account_data**: ONLY select this if the user asks for *numbers* or *specific records* (Balance, Transactions).
+   - "Can I overpay?" is NOT account_data (It is a Rule/Policy).
+   - "What is my balance?" IS account_data.
+
+2. **product_acquisition**: ONLY select this if the user wants to *buy/open* something NEW.
+   - "What are the rules for mortgages?" is NOT acquisition (It is knowledge).
+   - "I want a new mortgage" IS acquisition.
+
+3. **knowledge_inquiry**: Select this for ANY question about how the bank works, rules, fees, limits, or "Can I..." questions.
+   - "Can I overpay my mortgage?" -> knowledge_inquiry (It asks about the RULE).
 """
 
     def _parse_llm_response(self, response_text: str) -> Dict[str, Any]:
