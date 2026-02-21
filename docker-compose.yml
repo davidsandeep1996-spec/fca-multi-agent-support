@@ -58,6 +58,7 @@ services:
 
 
     environment:
+
       # Application
       APP_NAME: FCA Multi-Agent Support System
       APP_VERSION: 0.1.0
@@ -92,6 +93,8 @@ services:
       # Logging
       LOG_LEVEL: INFO
       LOG_FILE: logs/app.log
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
     depends_on:
       db:
         condition: service_healthy
@@ -99,12 +102,37 @@ services:
         condition: service_healthy
     volumes:
       - ./logs:/app/logs
-      - ./app:/app/app          # <---  THIS (Syncs python code)
+      - .:/app          # <---  THIS (Syncs python code)
       - ./alembic:/app/alembic  # <---  THIS (Syncs migrations)
       - ./tests:/app/tests    # <---  THIS (Syncs tests)
+
     networks:
       - fca-network
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+  # [CHANGE 1c] Add Background Worker Service
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fca-worker
+    restart: unless-stopped
+    environment:
+      # Needs same DB/Redis config as web
+      DATABASE_URL: postgresql+asyncpg://fca_user:fca_password@db:5432/fca_support
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      # HuggingFace Token for RAG (if used)
+      HF_TOKEN: ${HF_TOKEN}
+    volumes:
+      # Sync code so worker updates immediately too
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    networks:
+      - fca-network
+    # Run Celery worker
+    command: celery -A app.worker.celery_app worker --loglevel=info
 
     # [CHANGE 2a] Add Frontend Service
   frontend:

@@ -1,20 +1,20 @@
 import os
 
 # ---------------- CONFIGURATION ----------------
-output_filename = "full_project_context.txt"
+output_filename = "full_project_context_updated.txt"
 
 # 1. File types to include
 # Added .yml and .yaml explicitly for CI files
-valid_extensions = ['.py', '.toml', '.yml', '.yaml', '.json', '.md', '.sh']
+valid_extensions = ['.py', '.toml', '.yml', '.yaml', '.md', '.sh']
 
 # 2. Specific files to always include (no extension)
-valid_filenames = ['Dockerfile', 'Makefile', '.env.example', 'ci.yml']
+valid_filenames = ['Dockerfile', 'Makefile', '.env.example', 'ci.yml', 'requirements.txt']
 
 # 3. Folders to IGNORE (Skip these)
 # We exclude '.git' (history) but we do NOT exclude '.github' (workflows)
 ignore_folders = {
     'venv', '__pycache__', 'node_modules', '.idea', '.vscode',
-    '.git', '.pytest_cache', 'dist', 'build'
+    '.git', '.pytest_cache', 'dist', 'build','data', 'htmlcov', 'logs','scripts','uploads'
 }
 # -----------------------------------------------
 

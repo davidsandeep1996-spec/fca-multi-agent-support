@@ -10,15 +10,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 import logging
-
+from fastapi import UploadFile, File, BackgroundTasks, HTTPException
 
 from prometheus_fastapi_instrumentator import Instrumentator
-
+import shutil
+import os
 
 from fastapi.responses import StreamingResponse
 import json
 from app.coordinator.agent_coordinator import AgentCoordinator
 
+
+
+from app.worker import ingest_pdf_task
 # Import configuration and utilities
 from app.config import settings
 from app.logger import setup_logging
@@ -236,6 +240,33 @@ def create_application() -> FastAPI:
                 yield f"event: error\ndata: {error_data}\n\n"
 
         return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+    @app.post("/api/v1/admin/upload-background", tags=["Admin"])
+    async def upload_document_background(file: UploadFile = File(...)):
+        """
+        Uploads a file and processes it in the background (Celery).
+        """
+        try:
+            # 1. Save file locally so worker can access it
+            # (In production, upload to S3/GCS and pass the URL)
+            upload_dir = "/app/uploads"
+            os.makedirs(upload_dir, exist_ok=True)
+            file_path = os.path.join(upload_dir, file.filename)
+
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+
+            # 2. Trigger Celery Task
+            task = ingest_pdf_task.delay(file_path)
+
+            return {
+                "message": "File uploaded. Ingestion started in background.",
+                "filename": file.filename,
+                "task_id": task.id
+            }
+        except Exception as e:
+            logger.error(f"Upload failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
 
     # Register routers
     app.include_router(

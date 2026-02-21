@@ -280,3 +280,7 @@ spacy==3.7.2
 pgvector
 sentence-transformers
 PyPDF2
+
+celery==5.3.6
+redis==5.0.1
+
