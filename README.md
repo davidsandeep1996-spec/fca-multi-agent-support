@@ -1,401 +1,308 @@
 # FCA Multi-Agent Support System
 
-[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-green.svg)](https://fastapi.tiangolo.com/)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)  
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.128.0-green.svg)](https://fastapi.tiangolo.com/)  
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**FCA-compliant multi-agent AI support system for UK financial services.**
-
-An intelligent customer support system using LangGraph multi-agent orchestration with FCA Consumer Duty compliance validation.
-
----
-
-## ✨ Features
-
-🤖 **Multi-Agent Architecture**
-- Intent classification for smart routing
-- Specialized agents (FAQ, Account, Payment, Compliance, Escalation)
-- LangGraph workflow orchestration
-
-🛡️ **FCA Consumer Duty Compliance**
-- Automated compliance checking
-- Vulnerable customer identification
-- Fair treatment validation
-- Clear communication standards
-
-🚀 **Production-Ready**
-- FastAPI async framework
-- PostgreSQL database with SQLAlchemy ORM
-- Redis caching (optional)
-- Comprehensive testing
-- Docker support
-
-📊 **Monitoring & Audit**
-- Complete audit trail
-- Agent performance metrics
-- Conversation analytics
-- Request tracking
+An intelligent, production-ready customer support system designed for UK financial services.  
+It uses a **LangGraph-based multi-agent architecture** with strict **FCA Consumer Duty compliance validation**, PII redaction, and prompt-injection defense.
 
 ---
 
-## 🏗️ Architecture
+# ✨ Features
 
-```
-User → FastAPI → LangGraph Workflow
-                      ↓
-        ┌─────────────────────────┐
-        │   Intent Classifier     │
-        └───────────┬─────────────┘
-                    ↓
-        ┌───────────────────────────────┐
-        │  FAQ | Account | Payment      │
-        └───────────┬───────────────────┘
-                    ↓
-        ┌───────────────────────────┐
-        │   Compliance Checker      │
-        └───────────┬───────────────┘
-                    ↓
-        ┌───────────────────────────┐
-        │   Escalation Agent        │
-        └───────────────────────────┘
-```
+## 🤖 Multi-Agent Orchestration (LangGraph)
+
+- Intent classification routes queries to specialized agents  
+- Dedicated agents:
+  - Account inquiries
+  - FAQ / RAG knowledge
+  - Product recommendations
+  - Human escalation
+- Stateful conversation memory via `AgentCoordinator`
 
 ---
 
-## 📋 Prerequisites
+## 🛡️ FCA Compliance & Security
 
-- **Python 3.11+**
-- **PostgreSQL 15+**
-- **Docker** (optional, recommended)
-- **Groq API Key** (free at https://console.groq.com)
+**Compliance Agent**
+- Detects prohibited claims (e.g., “risk-free”)  
+- Appends mandatory FCA disclaimers  
+- Blocks non-compliant responses  
 
----
-
-## 🚀 Quick Start
-
-### 1. Clone Repository
-
-```bash
-git clone https://github.com/yourusername/fca-multi-agent-support.git
-cd fca-multi-agent-support
-```
-
-### 2. Set Up Environment
-
-```bash
-# Create virtual environment
-python -m venv venv
-
-# Activate (Windows)
-venv\Scripts\activate
-
-# Activate (Mac/Linux)
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### 3. Configure Environment Variables
-
-```bash
-# Copy template
-cp .env.example .env
-
-# Edit .env with your settings
-# REQUIRED: Add your Groq API key
-notepad .env  # Windows
-nano .env     # Mac/Linux
-```
-
-### 4. Start Database (Docker)
-
-```bash
-docker-compose up -d db redis
-```
-
-### 5. Initialize Database
-
-```bash
-python scripts/init_db.py create
-```
-
-### 6. Run Application
-
-```bash
-uvicorn app.main:app --reload
-```
-
-Visit: http://localhost:8000/docs
+**Security Guardrails**
+- Prompt-injection defense (Lakera Guard)  
+- PII detection & redaction (Microsoft Presidio)  
 
 ---
 
-## 📁 Project Structure
+## 🚀 High-Performance Backend
 
+- FastAPI async API  
+- PostgreSQL + pgvector (relational + vector search)  
+- Redis + Celery (cache & background tasks)  
+- SQLAlchemy async ORM  
+
+---
+
+## 📊 Observability & Metrics
+
+- Langfuse (LLM tracing)  
+- Prometheus (metrics)  
+- Structured JSON logging  
+
+---
+
+# 🏗️ System Architecture
+
+The platform uses a LangGraph state machine to safely process messages:
+
+```text
+User Input
+   ↓
+Security Guardrail (Lakera Guard + Presidio)
+   ↓
+Intent Classifier Agent
+   ↓
+ ┌───────────────┬───────────────┬───────────────┐
+ ↓               ↓               ↓
+Account       General (RAG)    Product
+Agent          Agent           Agent
+ │               │               ↓
+ │               │        Compliance Checker
+ │               │               ↓
+ └───────────────┴───────────────→ Response
 ```
+
+Sensitive or complaint-related messages are automatically routed to the **Human Agent**.
+
+---
+
+# 💻 Tech Stack
+
+**Core**  
+- Python 3.11  
+- FastAPI  
+- Uvicorn  
+- Pydantic  
+
+**AI / LLM**  
+- Groq API (mixtral-8x7b-32768)  
+- LangChain  
+- LangGraph  
+
+**Database**  
+- PostgreSQL 15  
+- pgvector  
+- SQLAlchemy (async)  
+- Alembic  
+
+**Vector Embeddings**  
+- sentence-transformers (all-MiniLM-L6-v2)  
+- PyPDF2  
+
+**Task Queue**  
+- Celery  
+- Redis  
+
+**Security**  
+- Microsoft Presidio  
+- Lakera Guard  
+- passlib  
+- python-jose (JWT)  
+
+**Monitoring**  
+- Langfuse  
+- Prometheus Instrumentator  
+
+**Testing**  
+- Pytest  
+- pytest-asyncio  
+- httpx  
+
+---
+
+# 📁 Project Structure
+
+```text
 fca-multi-agent-support/
+│
 ├── app/
-│   ├── agents/          # AI agent implementations
-│   ├── graph/           # LangGraph workflows
-│   ├── models/          # Database models
-│   ├── routers/         # API endpoints
-│   ├── services/        # Business logic
-│   ├── middleware/      # HTTP middleware
-│   ├── config.py        # Configuration
-│   ├── database.py      # Database setup
-│   ├── logger.py        # Logging
-│   └── main.py          # FastAPI app
+│   ├── agents/          # AI agents (Account, General, Product, Compliance, Human, Intent)
+│   ├── api/             # API routes & dependencies
+│   ├── coordinator/     # Conversation state & memory manager
+│   ├── models/          # SQLAlchemy DB models
+│   ├── repositories/    # Database CRUD layer
+│   ├── routers/         # FastAPI routers
+│   ├── schemas/         # Pydantic schemas & workflow states
+│   ├── services/        # Business logic (RAG, Security, Customer, Product)
+│   ├── workflows/       # LangGraph state machine
+│   ├── config.py        # Environment config
+│   ├── database.py      # DB engine & session
+│   ├── main.py          # FastAPI entrypoint
+│   ├── seed_database.py # Test data generator
+│   └── worker.py        # Celery worker
 │
-├── tests/               # Test suite
-├── docs/                # Documentation
-├── scripts/             # Utility scripts
-├── .github/workflows/   # CI/CD pipelines
+├── data/                # Source docs (PDFs, FAQs)
+├── docs/                # Architecture docs
+├── frontend/            # Streamlit UI
+├── tests/               # Pytest suite
 │
-├── docker-compose.yml   # Docker orchestration
-├── Dockerfile           # Container definition
-├── requirements.txt     # Python dependencies
-├── pyproject.toml       # Tool configuration
-├── .env.example         # Environment template
-└── README.md            # This file
+├── .env.example
+├── docker-compose.yml
+├── Dockerfile
+└── requirements.txt
 ```
 
 ---
 
-## 🧪 Testing
+# 🚀 Quick Start (Docker)
+
+Run the full stack (API, DB, Redis, Worker, Frontend) using Docker Compose.
+
+## 1️⃣ Setup Environment
 
 ```bash
-# Run all tests
-pytest
+git clone <repository_url>
+cd fca-multi-agent-support
 
-# Run with coverage
-pytest --cov=app --cov-report=html
+cp .env.example .env
+```
 
-# Run specific test file
-pytest tests/test_agents.py
+Required `.env` keys:
 
-# Run integration tests only
-pytest -m integration
+```
+GROQ_API_KEY=
+SECRET_KEY=
+```
+
+Optional:
+
+```
+LANGFUSE_PUBLIC_KEY=
+LANGFUSE_SECRET_KEY=
+LAKERA_GUARD_API_KEY=
 ```
 
 ---
 
-## 🐳 Docker
-
-### Using Docker Compose (Recommended)
+## 2️⃣ Start Services
 
 ```bash
-# Start all services (app, database, redis)
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-
-# Rebuild after code changes
 docker-compose up -d --build
 ```
 
-### Manual Docker Build
+---
+
+## 3️⃣ Initialize & Seed Database
 
 ```bash
-# Build image
-docker build -t fca-support .
-
-# Run container
-docker run -p 8000:8000 --env-file .env fca-support
+docker-compose exec web python -m app.seed_database --clear --customers 100
 ```
 
 ---
 
-## 📊 API Endpoints
-
-### Chat
-- `POST /api/v1/chat` - Send message and get response
-- `GET /api/v1/conversation/{id}` - Get conversation history
-
-### Health
-- `GET /api/v1/health` - System health check
-- `GET /api/v1/ping` - Simple ping
-
-### Documentation
-- `GET /docs` - Swagger UI
-- `GET /redoc` - ReDoc UI
-
----
-
-## 🔧 Development
-
-### Code Formatting
+## 4️⃣ Background Data Ingestion (RAG)
 
 ```bash
-# Format code with black
-black app/
-
-# Sort imports
-isort app/
-
-# Lint with flake8
-flake8 app/
-
-# Type checking
-mypy app/
-```
-
-### Database Migrations
-
-```bash
-# Create migration
-alembic revision -m "description"
-
-# Apply migrations
-alembic upgrade head
-
-# Rollback
-alembic downgrade -1
+docker-compose exec web python -m app.ingest
 ```
 
 ---
 
-## 📈 Monitoring
+## 5️⃣ Access the Application
 
-### Logs
+- API docs → http://localhost:8000/docs  
+- Streamlit UI → http://localhost:8501  
 
-Logs are written to `logs/app.log` in JSON format:
+---
+
+# 🧩 Core Components
+
+## Agents (`app/agents/`)
+
+**IntentClassifierAgent**  
+Routes requests: account, product, FAQ, or human support.
+
+**GeneralAgent**  
+RAG-based FAQ & policy responses using pgvector.
+
+**AccountAgent**  
+Secure balance & transaction retrieval.
+
+**ProductRecommenderAgent**  
+Suggests savings, credit, or loan products.
+
+**ComplianceCheckerAgent**  
+Enforces FCA wording & disclaimers.
+
+**HumanAgent**  
+Creates escalation tickets with priority levels.
+
+---
+
+## LangGraph Workflow (`app/workflows/message_workflow.py`)
+
+State machine controlling:
+
+1. Guardrail validation  
+2. Intent classification  
+3. Agent routing  
+4. Compliance check  
+5. Response formatting  
+
+---
+
+## Security & PII (`app/services/security_service.py`)
+
+**Prompt Injection Defense**
+- Heuristic detection  
+- Optional Lakera Guard API  
+
+**PII Redaction**
+- Presidio analyzer + anonymizer  
+- Masks sensitive entities (e.g., card numbers)  
+
+---
+
+# 🧪 Testing & Verification
+
+Run full test suite:
 
 ```bash
-# View logs
-tail -f logs/app.log
-
-# Parse JSON logs
-cat logs/app.log | jq
+python verify_full_workflow.py
+python verify_evaluation.py
+python verify_memory.py
 ```
 
-### Metrics
+Diagnostic scripts:
 
-Agent performance metrics tracked in `agent_metrics` table.
-
----
-
-## 🛡️ Security
-
-- ✅ Environment variables for secrets
-- ✅ SQL injection prevention (SQLAlchemy ORM)
-- ✅ Input validation (Pydantic)
-- ✅ Rate limiting
-- ✅ CORS configuration
-- ✅ Request size limits
+- `verify_full_workflow.py` → end-to-end LangGraph test  
+- `verify_rag.py` → semantic search evaluation  
+- `verify_evaluation.py` → adversarial prompt testing  
+- `verify_memory.py` → multi-turn context validation  
 
 ---
 
-## 📝 Configuration
+# 📡 API Highlights
 
-Key environment variables (see `.env.example`):
+**POST** `/api/v1/messages/process`  
+Main chat endpoint.
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `GROQ_API_KEY` | Groq AI API key | ✅ Yes |
-| `DATABASE_URL` | PostgreSQL connection | ✅ Yes |
-| `SECRET_KEY` | Encryption key | ✅ Yes |
-| `REDIS_URL` | Redis connection | ❌ Optional |
-| `LOG_LEVEL` | Logging verbosity | ❌ Optional |
+**GET** `/chat/stream`  
+Server-sent events streaming.
 
----
+**POST** `/api/v1/admin/seed-db`  
+Trigger DB seeding.
 
-## 🤝 Contributing
+**POST** `/api/v1/admin/upload-background`  
+Async PDF ingestion.
 
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
-
-### Code Standards
-
-- Follow PEP 8 (enforced by black)
-- Add tests for new features
-- Update documentation
-- Keep commits atomic
+**GET** `/api/v1/health`  
+System health diagnostics.
 
 ---
 
 ## 📜 License
 
 This project is licensed under the MIT License - see [LICENSE](LICENSE) file.
-
----
-
-## 🙏 Acknowledgments
-
-- **LangChain & LangGraph** - AI agent framework
-- **FastAPI** - Web framework
-- **Groq** - Fast LLM inference
-- **FCA** - Consumer Duty principles
-
----
-
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/davidsandeep1996-spec/fca-multi-agent-support/issues)
-
-- **Email**: davidsandeep1996@gmail.com
-
----
-
-## 🗺️ Roadmap
-
-- [x] Phase 1: Project setup
-- [x] Phase 2: Core application
-- [x] Phase 3: Database layer
-- [x] Phase 4: Multi-agent system
-- [x] Phase 5: API & services
-- [ ] Phase 6: WebSocket support
-- [ ] Phase 7: Admin dashboard
-- [ ] Phase 8: Production deployment
-
-
-## Progress
-
-### ✅ Phase 1: Project Setup (Complete)
-- Git repository initialized
-- Directory structure created
-- Configuration files (.gitignore, .env.example, etc.)
-- Docker setup (Dockerfile, docker-compose.yml)
-- CI/CD pipeline (.github/workflows/ci.yml)
-- Development environment (VS Code settings)
-- Documentation (README, CONTRIBUTING, Architecture)
-
-### ✅ Phase 2: Core Application (Complete)
-- FastAPI application structure
-- Configuration management (Pydantic Settings)
-- Structured logging (JSON format)
-- Database connection (SQLAlchemy async)
-- Base models and mixins
-- Health check endpoints
-- Test infrastructure (pytest)
-- Basic test coverage
-
-### ✅ Phase 3: Database Layer (Complete)
-- Customer model
-- Conversation model
-- Message model
-- Repository pattern
-- Service layer
-
-### ⏳ Phase 4: Multi-Agent System (In Progress)
-- Agent base classes
-- Intent classifier
-- Product recommender
-- Compliance checker
-- LangGraph workflow
-
-### ⏳ Phase 5: API & Services
-- Conversation endpoints
-- Message endpoints
-- WebSocket support
-- Real-time chat
-
----
-
-**Made with ❤️ for UK Financial Services**
