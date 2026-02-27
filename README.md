@@ -196,6 +196,257 @@ graph TD
 5. Human-in-the-Loop (HITL): If the Compliance Node detects severe policy violations or prohibited language in the product recommendation, it routes to the Human Approval node, which pauses the graph's execution. An administrator must then manually review, edit, and resume the graph to send the final response.
 
 ---
+## Retrieval-Augmented Generation (RAG) Architecture:
+
+To provide accurate answers regarding company policies and prevent LLM hallucinations, the system uses a local RAG pipeline powered by pgvector and sentence-transformers. The architecture is divided into an asynchronous background ingestion pipeline and a real-time retrieval pipeline.
+
+```mermaid
+
+graph TD
+
+    %% Background Ingestion Flow
+    subgraph Background PDF Ingestion
+        PDF[PDF Documents]:::worker
+        Celery[Celery Worker <br> ingest_pdf_task]:::worker
+        TextSplitter[Text Splitter <br> Split by 'Q:']:::worker
+        Embed_Worker[sentence-transformers <br> all-MiniLM-L6-v2]:::worker
+        DB[(PostgreSQL <br> pgvector 384d)]:::database
+
+        PDF -->|1. Upload| Celery
+        Celery -->|2. Extract text via PyPDF2| TextSplitter
+        TextSplitter -->|3. Clean & Chunk| Embed_Worker
+        Embed_Worker -->|4. Generate Vector| DB
+    end
+
+    %% Real-Time User Flow
+    subgraph Real-Time Retrieval & Generation
+        Query((User Query)):::user
+        Agent[General Agent]:::process
+        FAQ_Check{FAQ DB Match?}:::process
+        Embed_Service[RAG Service <br> sentence-transformers]:::process
+        Prompt[System Prompt <br> KNOWLEDGE BASE DOCUMENTS]:::process
+        Groq((Groq API <br> LLM)):::llm
+        Response((Final Answer)):::user
+
+        Query -->|1. Ask Policy Question| Agent
+        Agent -->|2. Try FAQ Search| FAQ_Check
+        
+        FAQ_Check -- "No Match" --> Embed_Service
+        FAQ_Check -- "Match Found" --> Response
+        
+        Embed_Service -->|3. Embed Query| Embed_Service
+        Embed_Service -->|4. pgvector L2 Distance Search| DB
+        DB -->|5. Return Top 6 Chunks| Embed_Service
+        Embed_Service -->|6. Format Context| Agent
+        Agent -->|7. Inject Context + History| Prompt
+        Prompt -->|8. Execute Request| Groq
+        Groq -->|9. Grounded Text Generation| Response
+    end
+
+```
+
+**Background Data Ingestion (Celery)**
+
+To maintain high API performance, document ingestion is offloaded to a Celery background worker running an asyncio event loop.
+
+ - When PDF documents are uploaded, the ingest_pdf_task utilizes PyPDF2 to extract raw text.
+
+ - The RAGService cleans the text of breaking newlines and semantically chunks it by splitting at "Q:" to preserve Question & Answer blocks together.
+
+ - The open-source all-MiniLM-L6-v2 model generates 384-dimensional vector embeddings for each chunk.
+
+ - The text and its corresponding vector are saved into the document_chunks table in PostgreSQL utilizing the pgvector extension.
+
+**Real-Time Retrieval (General Agent)**
+
+When a user asks a policy or knowledge-based question, the GeneralAgent manages the retrieval workflow:
+
+ - The agent first attempts a direct lookup in the FAQService.
+
+ - If no FAQ match is found, the agent passes the user's query to the RAGService.
+
+ - The RAGService embeds the user's query using the all-MiniLM-L6-v2 model and performs a mathematical L2 Distance (<->) similarity search against the PostgreSQL pgvector database.
+
+ - The database returns the top 6 most relevant text chunks.
+
+ - The GeneralAgent formats these chunks under a KNOWLEDGE BASE DOCUMENTS: header.
+
+ - This context, along with the conversation history, is injected into the system prompt and sent to the Groq LLM API, instructing the model to formulate its answer using only the provided documents.
+
+---
+## Enterprise Security & FCA Compliance Pipeline
+
+Because this system operates within the UK Financial Services sector, it implements a dual-layered security architecture: Input Guardrails to protect the AI, and Output Guardrails to protect the customer.
+
+```mermaid
+
+graph TD
+
+
+    %% Input Flow
+    Input((Raw User Input)):::input
+    PII[Microsoft Presidio <br> Masks: Name, Email, CC, Phone]:::presidio
+    Lakera[Lakera Guard API <br> Prompt Injection Detection]:::lakera
+    Heuristics[Heuristic & Length Check <br> Blocks 'system override']:::lakera
+    Rejected((Request Blocked)):::lakera
+
+    %% AI Execution
+    LangGraph[LangGraph Routing]:::agent
+    Agent[Product Agent <br> Drafts Recommendation]:::agent
+
+    %% Output Flow
+    Rules[Rule-Based Filter <br> Blocks: 'Guaranteed', 'Risk-Free']:::fca
+    FCACheck[LLM FCA Evaluation <br> Checks PRIN Guidelines]:::fca
+    Disclaimers[Disclaimer Injection <br> Appends APR & Risk Warnings]:::fca
+    Human[Human Approval Queue]:::human
+    Output((Final Safe Response)):::input
+
+    %% Data Flow Routing
+    Input -->|1. Receive Message| PII
+    PII -->|2. Sanitized Prompt| Lakera
+    
+    Lakera -- "Threat Detected" --> Rejected
+    Lakera -- "Safe" --> Heuristics
+    Heuristics -- "Keyword Match" --> Rejected
+    
+    Heuristics -->|3. Clean Prompt| LangGraph
+    LangGraph --> Agent
+    
+    Agent -->|4. Draft Response| Rules
+    Rules --> FCACheck
+    
+    FCACheck -- "Severe Violation" --> Human
+    FCACheck -- "Approved" --> Disclaimers
+    
+    Disclaimers -->|5. Appends Warnings| Output
+    Human -- "Admin Edits & Resumes" --> Output
+
+```
+
+**Layer 1: Input Guardrails (Protecting the System)**
+Before any user message reaches an LLM, it is intercepted by the SecurityService.
+
+ - Data Privacy (Microsoft Presidio): The system uses NLP via presidio-analyzer to detect sensitive PII (Emails, Phone Numbers, Credit Cards, Names) and replaces them with safe tokens (e.g., [EMAIL], [CONFIDENTIAL_DATA]) to prevent data leakage into the LLM context window.
+
+ - Adversarial Defense (Lakera Guard): The sanitized prompt is sent to the Lakera Guard API to detect sophisticated prompt injections, jailbreaks, and role-play attacks.
+
+ - Heuristic Fallback: A final fast-pass heuristic checks for financial crime keywords (e.g., "launder money") and enforces strict character limits.
+
+**Layer 2: Output Guardrails (Protecting the Customer)**
+If an agent generates a financial product recommendation, the drafted response is intercepted by the ComplianceCheckerAgent.
+
+ - Prohibited Language Check: The text is scanned against a hardcoded dictionary to block illegal marketing terms like "100% safe", "risk-free", or "guaranteed".
+
+ - FCA Principles Evaluation: A dedicated LLM evaluates the response against core UK Financial Conduct Authority principles, ensuring the communication is "clear, fair, and not misleading".
+
+ - Dynamic Disclaimer Injection: Based on the detected product type (e.g., Investments, Credit), the system automatically appends legally mandated warnings such as "Representative APR - your rate may differ" or "Investments can go down as well as up".
+
+ - Human-in-the-Loop (HITL): If a severe violation is detected, the graph automatically pauses and routes the conversation to a human administrator for manual review and editing.
+
+
+---
+## Database Entity Relationship Architecture
+
+The system uses a unified PostgreSQL database managed by asynchronous SQLAlchemy to handle both conversational state and simulated core banking data.
+
+```mermaid
+
+
+erDiagram
+    %% Core Chat Relationships
+    CUSTOMER ||--o{ CONVERSATION : "has many"
+    CONVERSATION ||--o{ MESSAGE : "contains"
+    
+    %% Core Banking Relationships
+    CUSTOMER ||--o{ ACCOUNT : "linked via external customer_id"
+    PRODUCT ||--o{ ACCOUNT : "defines"
+    ACCOUNT ||--o{ TRANSACTION : "has many"
+
+    %% Entity Definitions
+    CUSTOMER {
+        int id PK
+        string customer_id UK "External Core Banking ID"
+        string first_name
+        string email UK
+        boolean is_vip
+        string role
+    }
+
+    CONVERSATION {
+        int id PK
+        int customer_id FK "References Customer.id"
+        string title
+        string status "active, resolved, escalated"
+        string intent
+        int message_count
+        string escalation_reason
+    }
+
+    MESSAGE {
+        int id PK
+        int conversation_id FK
+        string role "customer, agent, system"
+        text content
+        string agent_name
+        string intent
+    }
+
+    ACCOUNT {
+        int id PK
+        string account_number UK
+        string customer_id FK "Logical Link to Customer.customer_id"
+        int product_id FK
+        string type "current, savings, loan, credit"
+        string status
+        numeric balance
+    }
+
+    TRANSACTION {
+        int id PK
+        int account_id FK
+        string reference UK
+        numeric amount
+        string description
+        datetime date
+    }
+
+    PRODUCT {
+        int id PK
+        string name
+        string type
+        numeric interest_rate
+        json features
+        boolean is_active
+    }
+
+    FAQ {
+        int id PK
+        string question
+        text answer
+        string category
+    }
+
+```
+
+**The Chat Domain:**
+
+ - Customer: The central entity that tracks user authentication, VIP status, and personal details. It acts as the primary key holder for all AI interactions.
+
+ - Conversation: Tied directly to the Customer.id, this table tracks the overarching state of a chat session, including its status (active, resolved, escalated), detected intent, and routing metadata like escalation_reason or assigned_group.
+
+ - Message: Linked to a Conversation via a cascading foreign key, this table persists the multi-turn dialogue. It stores the role (customer vs. agent), the raw content, and the specific agent_name that generated the response.
+
+**The Banking & Knowledge Domain:**
+
+ - Account & Customer Link: Rather than a hard database constraint, the Account table logically links back to the user via an external customer_id string. This mimics real-world enterprise architectures where core banking mainframes and modern web backends are decoupled.
+
+ - Transaction: Linked directly to an Account, providing the historical ledger data (amounts, descriptions, dates) that the Account Agent fetches for user inquiries.
+
+ - Product: Defines the financial products available for the Product Recommender to suggest, storing data like interest_rate and dynamic JSON features.
+
+ - FAQ: A standalone knowledge base table that the General Agent queries to answer company policy questions. (Note: Unstructured PDF knowledge is stored separately in the pgvector chunks table).
+
+---
 
 # 💻 Tech Stack
 
