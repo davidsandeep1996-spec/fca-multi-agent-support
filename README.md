@@ -347,104 +347,150 @@ If an agent generates a financial product recommendation, the drafted response i
 ---
 ## Database Entity Relationship Architecture
 
-The system uses a unified PostgreSQL database managed by asynchronous SQLAlchemy to handle both conversational state and simulated core banking data.
+The application utilizes an asynchronous PostgreSQL database via SQLAlchemy, unified under a single schema but logically separated into three distinct data domains.
 
 ```mermaid
 
 
 erDiagram
-    %% Core Chat Relationships
-    CUSTOMER ||--o{ CONVERSATION : "has many"
-    CONVERSATION ||--o{ MESSAGE : "contains"
-    
-    %% Core Banking Relationships
-    CUSTOMER ||--o{ ACCOUNT : "linked via external customer_id"
-    PRODUCT ||--o{ ACCOUNT : "defines"
-    ACCOUNT ||--o{ TRANSACTION : "has many"
-
-    %% Entity Definitions
-    CUSTOMER {
+    %% Core Banking Domain
+    CUSTOMERS {
         int id PK
-        string customer_id UK "External Core Banking ID"
+        string customer_id UK "External Bank ID"
         string first_name
+        string last_name
         string email UK
+        string phone
+        string account_number
+        boolean is_active
+        boolean is_verified
         boolean is_vip
+        string hashed_password
         string role
+        string scopes
+        text notes
+        datetime created_at
+        datetime updated_at
     }
 
-    CONVERSATION {
-        int id PK
-        int customer_id FK "References Customer.id"
-        string title
-        string status "active, resolved, escalated"
-        string intent
-        int message_count
-        string escalation_reason
-    }
-
-    MESSAGE {
-        int id PK
-        int conversation_id FK
-        string role "customer, agent, system"
-        text content
-        string agent_name
-        string intent
-    }
-
-    ACCOUNT {
+    ACCOUNTS {
         int id PK
         string account_number UK
-        string customer_id FK "Logical Link to Customer.customer_id"
+        string customer_id "Soft Link to Customers"
         int product_id FK
-        string type "current, savings, loan, credit"
+        string type
         string status
+        string currency
         numeric balance
+        numeric available_balance
+        datetime created_at
+        datetime updated_at
     }
 
-    TRANSACTION {
+    TRANSACTIONS {
         int id PK
         int account_id FK
         string reference UK
         numeric amount
+        string currency
         string description
+        string category
         datetime date
+        string merchant_name
+        datetime created_at
+        datetime updated_at
     }
 
-    PRODUCT {
+    PRODUCTS {
         int id PK
         string name
         string type
+        text description
         numeric interest_rate
         json features
+        json requirements
         boolean is_active
+        datetime created_at
+        datetime updated_at
     }
 
-    FAQ {
+    %% AI Conversation Domain
+    CONVERSATIONS {
+        int id PK
+        int customer_id FK
+        string title
+        string status
+        string channel
+        text summary
+        string intent
+        string sentiment
+        int message_count
+        text escalation_reason
+        string priority
+        string ticket_id
+        string assigned_group
+        datetime created_at
+        datetime updated_at
+    }
+
+    MESSAGES {
+        int id PK
+        int conversation_id FK
+        string role
+        text content
+        string agent_name
+        string intent
+        string sentiment
+        int confidence_score
+        boolean is_error
+        boolean requires_human
+        text metadata_json
+        datetime created_at
+        datetime updated_at
+    }
+
+    %% Knowledge Base Domain
+    FAQS {
         int id PK
         string question
         text answer
         string category
+        string keywords
+        boolean is_active
     }
+
+    DOCUMENT_CHUNKS {
+        int id PK
+        string filename
+        text content
+        vector embedding "384 dimensions"
+    }
+
+    %% Relationships
+    CUSTOMERS ||--o{ CONVERSATIONS : "has"
+    CONVERSATIONS ||--o{ MESSAGES : "contains"
+    
+    %% Soft link: Account uses external string customer_id, not internal int ID
+    CUSTOMERS ||--o{ ACCOUNTS : "owns (via external ID)"
+    
+    PRODUCTS ||--o{ ACCOUNTS : "defines type of"
+    ACCOUNTS ||--o{ TRANSACTIONS : "records"
 
 ```
 
-**The Chat Domain:**
-
- - Customer: The central entity that tracks user authentication, VIP status, and personal details. It acts as the primary key holder for all AI interactions.
-
- - Conversation: Tied directly to the Customer.id, this table tracks the overarching state of a chat session, including its status (active, resolved, escalated), detected intent, and routing metadata like escalation_reason or assigned_group.
-
- - Message: Linked to a Conversation via a cascading foreign key, this table persists the multi-turn dialogue. It stores the role (customer vs. agent), the raw content, and the specific agent_name that generated the response.
-
-**The Banking & Knowledge Domain:**
-
- - Account & Customer Link: Rather than a hard database constraint, the Account table logically links back to the user via an external customer_id string. This mimics real-world enterprise architectures where core banking mainframes and modern web backends are decoupled.
-
- - Transaction: Linked directly to an Account, providing the historical ledger data (amounts, descriptions, dates) that the Account Agent fetches for user inquiries.
-
- - Product: Defines the financial products available for the Product Recommender to suggest, storing data like interest_rate and dynamic JSON features.
-
- - FAQ: A standalone knowledge base table that the General Agent queries to answer company policy questions. (Note: Unstructured PDF knowledge is stored separately in the pgvector chunks table).
+**AI Chat & Memory Domain (conversations, messages)**
+  - Tracks multi-turn chat sessions and individual messages.
+  - Each message stores crucial AI metadata, including the executing agent_name, detected intent, sentiment, and confidence_score.
+  - The conversations table manages stateful data such as status (Active, Resolved, Escalated), total message_count, and human-in-the-loop escalation data (ticket_id, assigned_group).
+  
+**Core Banking Domain (customers, accounts, transactions, products)**
+  - Represents the read-only or transactional systems integrated from external banking APIs.
+  - Important Design Note: Notice that the accounts table uses an external string customer_id rather than the internal integer id. This is a microservice best practice, mimicking how a real AI service would link to a decoupled legacy banking system.
+  - The products table serves as the structured catalog for the ProductRecommenderAgent, storing JSON arrays for features and requirements.
+  
+**Knowledge & RAG Domain (faqs, document_chunks)**
+  - Serves as the ground truth for the GeneralAgent.
+  - faqs handles standard QA pairs, while document_chunks utilizes PostgreSQL's pgvector extension to store 384-dimensional mathematical arrays alongside the text context parsed from PDF policies.
 
 ---
 
