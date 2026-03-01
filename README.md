@@ -493,6 +493,58 @@ erDiagram
   - faqs handles standard QA pairs, while document_chunks utilizes PostgreSQL's pgvector extension to store 384-dimensional mathematical arrays alongside the text context parsed from PDF policies.
 
 ---
+## Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant API as FastAPI
+    participant Coord as AgentCoordinator
+    participant Sec as SecurityService
+    participant DB as PostgreSQL
+    participant Graph as LangGraph (MessageWorkflow)
+    participant LLM as Groq API
+    participant Langfuse as Langfuse (Async)
+
+    User->>API: POST /chat {message, customer_id}
+    API->>Coord: process_message()
+    
+    %% Security Phase
+    Coord->>Sec: sanitize_input(message)
+    Sec-->>Coord: sanitized_message
+    
+    %% DB State Loading
+    Coord->>DB: Fetch Conversation History
+    DB-->>Coord: History Context
+    Coord->>DB: Save User Message (MessageRole.CUSTOMER)
+    
+    %% Graph Execution
+    Coord->>Graph: ainvoke(state)
+    
+    Graph->>Sec: _node_guardrail (Jailbreak Check)
+    Sec-->>Graph: Safe
+    
+    Graph->>LLM: _node_classify (Intent Classifier)
+    LLM-->>Graph: Intent (e.g., product_acquisition)
+    Langfuse-xGraph: Async Trace Logged
+    
+    Graph->>LLM: _node_product (Specialized Agent)
+    LLM-->>Graph: Draft Response
+    
+    Graph->>LLM: _node_compliance (FCA Checker)
+    LLM-->>Graph: Approved + Disclaimers
+    
+    Graph-->>Coord: final_response
+    
+    %% DB Save & Return
+    Coord->>DB: Save Agent Message (MessageRole.AGENT)
+    Coord-->>API: {response, intent, confidence}
+    API-->>User: HTTP 200 OK (Final Output)
+```
+
+
+---
 
 # 💻 Tech Stack
 
