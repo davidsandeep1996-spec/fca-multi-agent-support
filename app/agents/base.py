@@ -60,7 +60,7 @@ class AgentConfig:
 
     def __init__(
         self,
-        model_name: str = "llama-3.1-8b-instant",
+        model_name: str = "openai/gpt-oss-120b",
         temperature: float = 0.7,
         max_tokens: int = 1024,
         timeout: int = 30,

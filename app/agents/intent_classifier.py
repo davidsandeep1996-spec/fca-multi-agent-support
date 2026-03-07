@@ -28,10 +28,15 @@ class IntentClassifierAgent(BaseAgent):
 
     INTENTS = {
         "product_acquisition": {
-            "description": "Customer wants to APPLY for a NEW loan, card, or account. NOT for questions about existing ones.",
+            "description": """Customer wants RECOMMENDATIONS, wants to APPLY, or is asking for DETAILS/OPTIONS/TERMS/PENALTIES about a specific product (loans, bonds, cards, accounts, savings for a goal). \n
+            CRITICAL RULE: You MUST choose this intent if the user mentions a SPECIFIC product by name (e.g., 'Fixed Rate Bond', 'Mortgage', 'Credit Card') and asks about its rules, penalties, early withdrawals, terms, or features. This handles both sales AND specific product policy questions.""",
             "examples": [
                 "I want to apply for a mortgage",
+                "What happens if I withdraw my money early? Are there penalties?",
                 "What are your loan interest rates?",
+                "What is the best account to put my emergency fund into?",
+                "I am traveling next month and need a plastic card",
+                "Tell me more about the Fixed Rate Bond",
                 "Can I get a personal loan?",
                 "Is the loan guaranteed?",
                 "Tell me more about that product",
@@ -305,8 +310,9 @@ CRITICAL ROUTING RULES:
    - "What is my balance?" IS account_data.
 
 2. **product_acquisition**: ONLY select this if the user wants to *buy/open* something NEW.
+   - "Is approval guaranteed for the personal loan?" -> product_acquisition
    - "What are the rules for mortgages?" is NOT acquisition (It is knowledge).
-   - "I want a new mortgage" IS acquisition.
+   - "I want a new mortgage" IS product_acquisition.
 
 3. **knowledge_inquiry**: Select this for ANY question about how the bank works, rules, fees, limits, or "Can I..." questions.
    - "Can I overpay my mortgage?" -> knowledge_inquiry (It asks about the RULE).

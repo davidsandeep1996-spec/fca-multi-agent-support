@@ -22,9 +22,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/fca-multi-agent-support"
-Repository = "https://github.com/yourusername/fca-multi-agent-support"
-Documentation = "https://github.com/yourusername/fca-multi-agent-support/docs"
+Homepage = "https://github.com/davidsandeep1996-spec/fca-multi-agent-support"
+Repository = "https://github.com/davidsandeep1996-spec/fca-multi-agent-support"
 
 # ============================================================================
 # TOOL CONFIGURATION

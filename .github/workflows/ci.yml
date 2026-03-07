@@ -90,21 +90,28 @@ jobs:
       # TESTING
       # ========================================================================
 
+     # ========================================================================
+      # TESTING
+      # ========================================================================
+
+      - name: Seed the Database with Python Script
+        env:
+          # Inject the connection string so your script knows where to insert the data
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
+        run: |
+          # Run your Python script to build the schema and insert the products
+          alembic upgrade head
+          python seed_database.py
+
       - name: Run tests with pytest
         env:
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
           REDIS_URL: redis://localhost:6379/0
-          GROQ_API_KEY: test_key
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           SECRET_KEY: test-secret-key
           ENVIRONMENT: test
         run: |
           pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=xml
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage.xml
-          fail_ci_if_error: false
 
   # ============================================================================
   # BUILD JOB

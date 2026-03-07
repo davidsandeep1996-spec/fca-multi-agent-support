@@ -240,7 +240,7 @@ class ComplianceCheckerAgent(BaseAgent):
                 )
 
         return self._filter_contextual_false_positives(content_lower, issues)
-    
+
     @observe(as_type="generation", name="Groq-Compliance-Check")
     async def _llm_compliance_check(
         self,
@@ -443,8 +443,13 @@ Be thorough and strict - compliance violations can result in significant penalti
         if any(word in content_lower for word in ["loan", "borrow", "mortgage"]):
             disclaimers.append(self.COMPLIANCE_RULES["required_disclaimers"]["loan"])
 
-        if any(word in content_lower for word in ["credit", "apr", "interest rate"]):
+        # [FIX 1a] Make credit keywords stricter to avoid false positives on savings
+        if any(word in content_lower for word in ["credit card", "apr", "credit limit", "overdraft"]):
             disclaimers.append(self.COMPLIANCE_RULES["required_disclaimers"]["credit"])
+
+        # [FIX 1b] Add the specific Savings disclaimer
+        if any(word in content_lower for word in ["savings", "bond", "deposit", "interest rate"]):
+            disclaimers.append(self.COMPLIANCE_RULES["required_disclaimers"]["savings"])
 
         # Check for sensitive topics
         for topic in self.COMPLIANCE_RULES["sensitive_topics"]:

@@ -266,6 +266,7 @@ zstandard==0.25.0
     # via langsmith
 
 passlib[bcrypt]
+
 bcrypt==3.2.2
 python-jose[cryptography]
 python-multipart
@@ -283,4 +284,3 @@ PyPDF2
 
 celery==5.3.6
 redis==5.0.1
-

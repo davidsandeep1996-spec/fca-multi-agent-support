@@ -35,7 +35,8 @@ class Settings(BaseSettings):
         description="Application version (semantic versioning)",
     )
 
-    environment: Literal["development", "staging", "production"] = Field(
+    environment: Literal["development", "staging", "production",
+                         "test"] = Field(
         default="development",
         description="Current environment",
     )
@@ -97,7 +98,7 @@ class Settings(BaseSettings):
     )
 
     groq_model: str = Field(
-        default="mixtral-8x7b-32768",
+        default="llama-3.1-8b-instant",
         description="Groq AI model name",
     )
 

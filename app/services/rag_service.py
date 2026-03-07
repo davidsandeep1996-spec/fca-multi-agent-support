@@ -83,7 +83,7 @@ class RAGService:
 
         return len(chunks)
 
-    
+
 
     async def search(self, query: str, limit: int = 6) -> List[Dict[str, Any]]:
         """Finds the most relevant document chunks for a given user query."""
