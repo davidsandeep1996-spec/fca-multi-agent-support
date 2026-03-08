@@ -98,6 +98,8 @@ jobs:
         env:
           # Inject the connection string so your script knows where to insert the data
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
         run: |
           # Run your Python script to build the schema and insert the products
           alembic upgrade head
