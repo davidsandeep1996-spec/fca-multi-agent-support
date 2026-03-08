@@ -102,7 +102,7 @@ jobs:
 
         run: |
           # Run your Python script to build the schema and insert the products
-          alembic upgrade head
+          # alembic upgrade head
           python seed_database.py
 
       - name: Run tests with pytest
