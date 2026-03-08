@@ -14,5 +14,5 @@ __all__ = [
     "AccountAgent",
     "MessageService",
     "ProductService",
-    "FAQService"
-    ]
+    "FAQService",
+]

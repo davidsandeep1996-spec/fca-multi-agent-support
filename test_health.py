@@ -12,6 +12,7 @@ from httpx import AsyncClient
 # HEALTH CHECK TESTS
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_health_check_success(client: AsyncClient):
     """
@@ -82,6 +83,7 @@ async def test_health_check_database_status(client: AsyncClient):
 # PING TESTS
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_ping_success(client: AsyncClient):
     """
@@ -112,6 +114,7 @@ async def test_ping_success(client: AsyncClient):
 # READINESS TESTS
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_readiness_success(client: AsyncClient):
     """
@@ -138,6 +141,7 @@ async def test_readiness_success(client: AsyncClient):
 # LIVENESS TESTS
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_liveness_success(client: AsyncClient):
     """
@@ -163,6 +167,7 @@ async def test_liveness_success(client: AsyncClient):
 # ============================================================================
 # ROOT ENDPOINT TESTS
 # ============================================================================
+
 
 @pytest.mark.asyncio
 async def test_root_endpoint(client: AsyncClient):

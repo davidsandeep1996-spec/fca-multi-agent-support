@@ -7,8 +7,9 @@ from app.services.rag_service import RAGService
 celery_app = Celery(
     "fca_worker",
     broker=os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0"),
-    backend=os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/0")
+    backend=os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/0"),
 )
+
 
 # [CHANGE 2b] Define Background Task
 @celery_app.task(name="ingest_pdf_task")

@@ -3,6 +3,7 @@ API Dependencies
 
 Reusable dependencies for dependency injection (Authentication, RBAC, Database).
 """
+
 from typing import Annotated
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, SecurityScopes
@@ -22,8 +23,9 @@ oauth2_scheme = OAuth2PasswordBearer(
         "read:accounts": "Read account balances",
         "write:transfer": "Execute transfers",
         "admin": "Admin privileges",
-    }
+    },
 )
+
 
 async def get_current_user(
     security_scopes: SecurityScopes,
@@ -48,9 +50,7 @@ async def get_current_user(
     try:
         # 1. Decode Token
         payload = jwt.decode(
-            token,
-            settings.secret_key,
-            algorithms=[settings.jwt_algorithm]
+            token, settings.secret_key, algorithms=[settings.jwt_algorithm]
         )
         customer_id: str = payload.get("sub")
         token_scopes = payload.get("scopes", "").split()
@@ -79,8 +79,9 @@ async def get_current_user(
 
     return user
 
+
 async def get_current_active_user(
-    current_user: Annotated[Customer, Depends(get_current_user)]
+    current_user: Annotated[Customer, Depends(get_current_user)],
 ) -> Customer:
     """Ensure user is active."""
     if not current_user.is_active:

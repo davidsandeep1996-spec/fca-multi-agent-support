@@ -2,6 +2,7 @@
 Product Recommender Agent
 Recommends financial products based on customer needs and profile.
 """
+
 from typing import Dict, Any, Optional, List
 from groq import AsyncGroq
 from app.agents.base import BaseAgent, AgentConfig, AgentResponse
@@ -16,43 +17,63 @@ from pydantic import BaseModel, Field, field_validator
 
 # [ENTERPRISE PATTERN 1] Define Strict Schemas for LLM Outputs
 
+
 class ProductCategoryExtraction(BaseModel):
     """Schema for extracting the database category from natural language."""
+
     category: str = Field(
         description="Must be exactly one of: 'loan', 'credit', 'savings', 'current'",
-        pattern="^(loan|credit|savings|current)$"
+        pattern="^(loan|credit|savings|current)$",
     )
+
 
 class RecommendationResult(BaseModel):
     """Schema for the final product recommendation response."""
+
     recommended_product_names: List[str] = Field(
-        description="A strict JSON array of exact product names. Example: [\"Product A\", \"Product B\"]. DO NOT use a comma-separated string."
+        description='A strict JSON array of exact product names. Example: ["Product A", "Product B"]. DO NOT use a comma-separated string.'
     )
-    reasoning: str = Field(description="Why these products are suitable (output as a single string)")
-    key_benefits: str = Field(description="Main benefits of the products (output as a single string)")
-    next_steps: str = Field(description="Actionable next steps (output as a single string)")
-    is_direct_answer: bool = Field(description="True if answering a specific question about a product, False if making a general recommendation")
-    direct_answer_text: Optional[str] = Field(description="The answer text if is_direct_answer is True")
+    reasoning: str = Field(
+        description="Why these products are suitable (output as a single string)"
+    )
+    key_benefits: str = Field(
+        description="Main benefits of the products (output as a single string)"
+    )
+    next_steps: str = Field(
+        description="Actionable next steps (output as a single string)"
+    )
+    is_direct_answer: bool = Field(
+        description="True if answering a specific question about a product, False if making a general recommendation"
+    )
+    direct_answer_text: Optional[str] = Field(
+        description="The answer text if is_direct_answer is True"
+    )
 
     #  Validator for the lists
-    @field_validator('recommended_product_names', mode='before')
+    @field_validator("recommended_product_names", mode="before")
     def correct_llm_string_to_list(cls, v):
         if isinstance(v, str):
-            return [item.strip() for item in v.split(',')]
+            return [item.strip() for item in v.split(",")]
         return v
 
     #  Validator for the strings (catches plural hallucination)
-    @field_validator('key_benefits', 'next_steps', 'reasoning', mode='before')
+    @field_validator("key_benefits", "next_steps", "reasoning", mode="before")
     def coerce_list_to_string(cls, v):
         if isinstance(v, list):
             # If LLM sends a list, join it automatically with bullet points
             return "\n".join(f"• {str(item)}" for item in v)
         return str(v)
+
+
 class ProductRecommenderAgent(BaseAgent):
-    def __init__(self, config: Optional[AgentConfig] = None, product_service: ProductService = None, **kwargs):
+    def __init__(
+        self,
+        config: Optional[AgentConfig] = None,
+        product_service: ProductService = None,
+        **kwargs,
+    ):
         super().__init__(name="product_recommender", config=config)
         self.client = AsyncGroq(api_key=self.config.api_key)
-
 
         self.product_service = product_service
 
@@ -74,10 +95,12 @@ class ProductRecommenderAgent(BaseAgent):
         try:
             return json.dumps(model_class.model_json_schema(), indent=2)
         except AttributeError:
-            return json.dumps(model_class.schema(), indent=2) # Pydantic v1 fallback
+            return json.dumps(model_class.schema(), indent=2)  # Pydantic v1 fallback
 
     @observe(name="ProductRecommender")
-    async def process(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentResponse:
+    async def process(
+        self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None
+    ) -> AgentResponse:
         await self.validate_input(input_data)
         self.log_request(input_data)
 
@@ -90,8 +113,9 @@ class ProductRecommenderAgent(BaseAgent):
 
         try:
             async with self.product_service as service:
-
-                recommendations = await self._generate_recommendations(service,intent, message, customer_profile, history)
+                recommendations = await self._generate_recommendations(
+                    service, intent, message, customer_profile, history
+                )
 
             response = self.create_response(
                 content=recommendations["response_text"],
@@ -109,16 +133,24 @@ class ProductRecommenderAgent(BaseAgent):
             return self.create_response(
                 content="I apologize, but I'm having trouble retrieving product information right now.",
                 metadata={"error": str(e)},
-                confidence=0.0
+                confidence=0.0,
             )
+
     #  Decorate this helper as a 'generation' to capture LLM inputs/outputs
     @observe(as_type="generation", name="Groq-Product-Recs")
-    async def _generate_recommendations(self, service: ProductService, intent: str, message: str, customer_profile: Dict[str, Any], history: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def _generate_recommendations(
+        self,
+        service: ProductService,
+        intent: str,
+        message: str,
+        customer_profile: Dict[str, Any],
+        history: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
         # 1. Update trace with model params
         langfuse = get_client()
         langfuse.update_current_generation(
             model=self.config.model_name,
-            model_parameters={"temperature": 0.5, "max_tokens": self.config.max_tokens}
+            model_parameters={"temperature": 0.5, "max_tokens": self.config.max_tokens},
         )
         # 1. Map intent to DB type (loan, credit, savings, current)
         category = await self._determine_category(intent, message)
@@ -127,18 +159,22 @@ class ProductRecommenderAgent(BaseAgent):
         available_products = await service.get_products_by_category(category)
 
         if not available_products:
-             return {
-                 "response_text": f"I currently don't have any specific {category} products to recommend.",
-                 "products": [],
-                 "reasoning": "No products found in database.",
-                 "disclaimers": [],
-                 "confidence": 0.5
-             }
+            return {
+                "response_text": f"I currently don't have any specific {category} products to recommend.",
+                "products": [],
+                "reasoning": "No products found in database.",
+                "disclaimers": [],
+                "confidence": 0.5,
+            }
 
         # 3. Build Prompt & Call LLM
-        prompt = self._build_recommendation_prompt(intent, message, customer_profile, available_products, history)
-        #schema_str = self._get_schema_str(RecommendationResult)
-        sys_prompt = self._get_system_prompt() + """
+        prompt = self._build_recommendation_prompt(
+            intent, message, customer_profile, available_products, history
+        )
+        # schema_str = self._get_schema_str(RecommendationResult)
+        sys_prompt = (
+            self._get_system_prompt()
+            + """
 
             You MUST output a SINGLE valid JSON object.
             Do NOT wrap it in an array. Do NOT output the schema definition.
@@ -153,6 +189,7 @@ class ProductRecommenderAgent(BaseAgent):
               "direct_answer_text": null
             }
             """
+        )
         # ADDED: Manually track generation
 
         try:
@@ -166,8 +203,7 @@ class ProductRecommenderAgent(BaseAgent):
                     ],
                     temperature=0.5,
                     max_tokens=self.config.max_tokens,
-                    response_format={"type": "json_object"}
-
+                    response_format={"type": "json_object"},
                 )
 
             response = await self.execute_with_retry(_call_llm)
@@ -176,9 +212,10 @@ class ProductRecommenderAgent(BaseAgent):
             raw_json = json.loads(response.choices[0].message.content)
             # Unwrap the object if the LLM hallucinated an array
             if isinstance(raw_json, list) and len(raw_json) > 0:
-                self.logger.warning("🛡️ Defense in Depth triggered: LLM returned an array instead of an object. Unwrapping...")
+                self.logger.warning(
+                    "🛡️ Defense in Depth triggered: LLM returned an array instead of an object. Unwrapping..."
+                )
                 raw_json = raw_json[0]
-
 
             parsed_result = RecommendationResult.model_validate(raw_json)
 
@@ -189,26 +226,29 @@ class ProductRecommenderAgent(BaseAgent):
                     "products": [],
                     "reasoning": "Direct Q&A",
                     "disclaimers": [],
-                    "confidence": 1.0
+                    "confidence": 1.0,
                 }
 
             # Map the exact string names back to DB objects safely
-            matched_products = [p for p in available_products if p.name in parsed_result.recommended_product_names]
+            matched_products = [
+                p
+                for p in available_products
+                if p.name in parsed_result.recommended_product_names
+            ]
 
             final_text = self._format_recommendation_text(
                 matched_products,
                 parsed_result.reasoning,
                 parsed_result.key_benefits,
-                parsed_result.next_steps
+                parsed_result.next_steps,
             )
 
-
-             #  Update usage stats on the active generation
+            #  Update usage stats on the active generation
             langfuse.update_current_generation(
                 usage_details={
                     "prompt_tokens": response.usage.prompt_tokens,
                     "completion_tokens": response.usage.completion_tokens,
-                    "total_tokens": response.usage.total_tokens
+                    "total_tokens": response.usage.total_tokens,
                 }
             )
 
@@ -216,14 +256,12 @@ class ProductRecommenderAgent(BaseAgent):
                 "response_text": final_text,
                 "products": matched_products,
                 "reasoning": parsed_result.reasoning,
-                "disclaimers": [], # Compliance agent handles this now!
+                "disclaimers": [],  # Compliance agent handles this now!
                 "confidence": 0.8,
             }
 
-
         except Exception as e:
             raise e
-
 
     async def _determine_category(self, intent: str, message: str) -> str:
         """
@@ -231,7 +269,7 @@ class ProductRecommenderAgent(BaseAgent):
         Maps natural language ("buy a house") to a strict DB category using JSON mode.
         """
         if intent != "product_acquisition":
-            return "savings" # Fallback
+            return "savings"  # Fallback
 
         try:
             schema_str = self._get_schema_str(ProductCategoryExtraction)
@@ -239,32 +277,49 @@ class ProductRecommenderAgent(BaseAgent):
             response = await self.client.chat.completions.create(
                 model=self.config.model_name,
                 messages=[
-                    {"role": "system", "content": f"You map user requests to database categories. Output ONLY valid JSON strictly matching this schema:\n{schema_str}"},
-                    {"role": "user", "content": f"User said: '{message}'"}
+                    {
+                        "role": "system",
+                        "content": f"You map user requests to database categories. Output ONLY valid JSON strictly matching this schema:\n{schema_str}",
+                    },
+                    {"role": "user", "content": f"User said: '{message}'"},
                 ],
                 temperature=0.0,
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
             )
 
             # Parse and validate with Pydantic
             raw_json = json.loads(response.choices[0].message.content)
             extracted = ProductCategoryExtraction.model_validate(raw_json)
 
-            self.logger.info(f"🧠 Semantic mapping: '{message}' -> '{extracted.category}'")
+            self.logger.info(
+                f"🧠 Semantic mapping: '{message}' -> '{extracted.category}'"
+            )
             return extracted.category
 
         except Exception as e:
-            self.logger.warning(f"Semantic extraction failed, defaulting to savings: {e}")
+            self.logger.warning(
+                f"Semantic extraction failed, defaulting to savings: {e}"
+            )
             return "savings"
 
-    def _build_recommendation_prompt(self, intent: str, message: str, customer_profile: Dict[str, Any], available_products: List[Any], history: List[Dict[str, Any]]) -> str:
+    def _build_recommendation_prompt(
+        self,
+        intent: str,
+        message: str,
+        customer_profile: Dict[str, Any],
+        available_products: List[Any],
+        history: List[Dict[str, Any]],
+    ) -> str:
 
         # Format history string
         history_str = ""
         if history:
-             history_str = "RECENT CONVERSATION:\n" + "\n".join(
-                [f"- {msg.get('role', 'unknown')}: {msg.get('content', '')}" for msg in history[-5:]]
-             )
+            history_str = "RECENT CONVERSATION:\n" + "\n".join(
+                [
+                    f"- {msg.get('role', 'unknown')}: {msg.get('content', '')}"
+                    for msg in history[-5:]
+                ]
+            )
         products_text = ""
         for i, p in enumerate(available_products, 1):
             features = ", ".join(p.features) if p.features else "Standard features"
@@ -272,7 +327,7 @@ class ProductRecommenderAgent(BaseAgent):
 
             # [FIX 1] Safely format the requirements dictionary into a readable string
             reqs = "None"
-            if hasattr(p, 'requirements') and p.requirements:
+            if hasattr(p, "requirements") and p.requirements:
                 reqs = ", ".join([f"{k}: {v}" for k, v in p.requirements.items()])
 
             products_text += (
@@ -280,12 +335,14 @@ class ProductRecommenderAgent(BaseAgent):
                 f"Description: {p.description}\n"
                 f"Interest Rate: {rate}\n"
                 f"Features: {features}\n"
-                f"Requirements: {reqs}\n\n" # [FIX 2] Inject it into the LLM's view
+                f"Requirements: {reqs}\n\n"  # [FIX 2] Inject it into the LLM's view
             )
             products_text += f"{i}. Product: {p.name}...\n"
 
         is_vip = customer_profile.get("is_vip", False) if customer_profile else False
-        customer_text = f"\n\nCustomer Profile:\n- VIP Status: {'Yes' if is_vip else 'No'}"
+        customer_text = (
+            f"\n\nCustomer Profile:\n- VIP Status: {'Yes' if is_vip else 'No'}"
+        )
 
         return f"""You are a financial product expert.
         Based on the customer's needs, recommend the most suitable financial products.
@@ -341,8 +398,9 @@ CONFIDENCE: <0.0-1.0>
         - If the exact penalty or rule is not in the database (e.g., it just says "Funds locked for term"), tell the user that funds are locked, but you do not have the exact penalty amounts and they should check the full terms and conditions. DO NOT hallucinate numbers.
         """
 
-
-    def _format_recommendation_text(self, products, reasoning, key_benefits, next_steps):
+    def _format_recommendation_text(
+        self, products, reasoning, key_benefits, next_steps
+    ):
         text = "Based on your needs, I recommend:\n\n"
         for i, p in enumerate(products, 1):
             rate = f"{p.interest_rate}%" if p.interest_rate is not None else "Variable"

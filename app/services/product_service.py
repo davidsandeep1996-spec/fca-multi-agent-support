@@ -2,17 +2,20 @@
 Product Service
 Business logic for product operations.
 """
+
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.base import BaseService
 from app.repositories.product import ProductRepository
 from app.models.product import Product
 
+
 class ProductService(BaseService):
     """
     Product service.
     Exposes product data to agents.
     """
+
     def __init__(self, db: AsyncSession = None):
         super().__init__(db)
         if self.db:

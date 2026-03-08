@@ -2,16 +2,20 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
+
 class AgentResponse(BaseModel):
     """Standard output for all agents."""
+
     content: str
     confidence: float
     metadata: Dict[str, Any] = Field(default_factory=dict)
     agent_name: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
+
 class WorkflowState(BaseModel):
     """The 'Memory' passed between LangGraph nodes."""
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # Inputs

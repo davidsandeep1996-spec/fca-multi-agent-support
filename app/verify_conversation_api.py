@@ -2,16 +2,18 @@
 VERIFY CONVERSATION API (Fixed for Async)
 Tests the DB persistence and History API endpoints using AsyncClient.
 """
+
 import asyncio
 import sys
-from httpx import AsyncClient # pip install httpx
+from httpx import AsyncClient  # pip install httpx
 from app.main import app
 from app.database import check_db_connection
 
+
 async def run_api_verification():
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("📜 CONVERSATION API TEST (ASYNC)")
-    print("="*60)
+    print("=" * 60)
 
     # 1. Setup Async Client
     # We use a base_url so we can just use relative paths
@@ -33,8 +35,8 @@ async def run_api_verification():
             json={
                 "message": message_text,
                 "customer_id": customer_id,
-                "conversation_id": conversation_id
-            }
+                "conversation_id": conversation_id,
+            },
         )
 
         if response.status_code != 200:
@@ -52,7 +54,9 @@ async def run_api_verification():
         # STEP 2: Fetch History (Test GET /history)
         # ---------------------------------------------------------
         print(f"\n📜 Fetching History for Conversation {real_conversation_id}...")
-        hist_response = await client.get(f"/api/v1/conversations/{real_conversation_id}/history")
+        hist_response = await client.get(
+            f"/api/v1/conversations/{real_conversation_id}/history"
+        )
 
         if hist_response.status_code != 200:
             print(f"❌ History API Failed: {hist_response.text}")
@@ -76,21 +80,28 @@ async def run_api_verification():
         # STEP 3: Fetch Customer Conversations (Test GET /conversations)
         # ---------------------------------------------------------
         print(f"\n🗂️  Fetching Conversations for Customer {customer_id}...")
-        conv_response = await client.get(f"/api/v1/customers/{customer_id}/conversations")
+        conv_response = await client.get(
+            f"/api/v1/customers/{customer_id}/conversations"
+        )
 
         if conv_response.status_code != 200:
             print(f"❌ Conversation List API Failed: {conv_response.text}")
             sys.exit(1)
 
         convs = conv_response.json()["conversations"]
-        target_conv = next((c for c in convs if c["conversation_id"] == real_conversation_id), None)
+        target_conv = next(
+            (c for c in convs if c["conversation_id"] == real_conversation_id), None
+        )
 
         if target_conv:
             print(f"✅ Found Conversation {conversation_id} in list.")
             print(f"   📊 Message Count: {target_conv['message_count']}")
             print("   ✅ PASS: Customer Conversation list works.")
         else:
-            print(f"   ❌ FAIL: Conversation {conversation_id} not found in customer list.")
+            print(
+                f"   ❌ FAIL: Conversation {conversation_id} not found in customer list."
+            )
+
 
 if __name__ == "__main__":
     # Ensure DB is up before running

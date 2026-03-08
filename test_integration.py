@@ -181,4 +181,3 @@ class TestStatistics:
         assert "account" in stats["agent_distribution"]
         assert "general" in stats["agent_distribution"]
         assert "human" in stats["agent_distribution"]
-

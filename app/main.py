@@ -4,6 +4,7 @@ FastAPI Application Entry Point
 This module initializes the FastAPI application, configures middleware,
 registers routers, and sets up CORS policies.
 """
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,8 +22,8 @@ import json
 from app.coordinator.agent_coordinator import AgentCoordinator
 
 
-
 from app.worker import ingest_pdf_task
+
 # Import configuration and utilities
 from app.config import settings
 from app.logger import setup_logging
@@ -42,7 +43,6 @@ logger = logging.getLogger(__name__)
 
 
 coordinator = AgentCoordinator()
-
 
 
 @asynccontextmanager
@@ -73,14 +73,6 @@ async def lifespan(app: FastAPI):
 
     logger.info("📊 Prometheus Metrics: ENABLED at /metrics")
 
-
-
-
-
-
-
-
-
     # Initialize database (development only)
     if settings.is_development:
         logger.info("Initializing database tables (development mode)")
@@ -90,8 +82,6 @@ async def lifespan(app: FastAPI):
             logger.error(f"Database initialization failed: {e}", exc_info=True)
 
     logger.info("Application startup complete")
-
-
 
     yield  # Application runs here
 
@@ -168,9 +158,6 @@ def create_application() -> FastAPI:
     )
     instrumentator.instrument(app).expose(app, include_in_schema=False)
 
-
-
-
     # ========================================================================
     # EXCEPTION HANDLERS
     # ========================================================================
@@ -193,7 +180,9 @@ def create_application() -> FastAPI:
             status_code=500,
             content={
                 "error": "Internal Server Error",
-                "message": str(exc) if settings.debug else "An unexpected error occurred",
+                "message": str(exc)
+                if settings.debug
+                else "An unexpected error occurred",
             },
         )
 
@@ -223,10 +212,13 @@ def create_application() -> FastAPI:
         """
         Stream chat response using Server-Sent Events (SSE).
         """
+
         async def event_generator():
             try:
                 # Iterate over the coordinator's generator
-                async for event in coordinator.stream_message(message, customer_id, conversation_id):
+                async for event in coordinator.stream_message(
+                    message, customer_id, conversation_id
+                ):
                     # Format as SSE data
                     yield f"data: {json.dumps(event)}\n\n"
 
@@ -261,7 +253,7 @@ def create_application() -> FastAPI:
             return {
                 "message": "File uploaded. Ingestion started in background.",
                 "filename": file.filename,
-                "task_id": task.id
+                "task_id": task.id,
             }
         except Exception as e:
             logger.error(f"Upload failed: {e}")
@@ -277,7 +269,6 @@ def create_application() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(messages_router)
     app.include_router(admin_router)
-
 
     return app
 

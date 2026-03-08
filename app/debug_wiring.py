@@ -2,16 +2,18 @@
 DEBUG: Agent Wiring Check
 Usage: docker compose exec web python -m app.debug_wiring
 """
+
 import asyncio
 from app.database import AsyncSessionLocal
 from app.repositories.faq import FAQRepository
 from app.services.faq_service import FAQService
 from app.agents.general_agent import GeneralAgent
 
+
 async def main():
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print("🔌 AGENT WIRING DIAGNOSTIC")
-    print("="*50)
+    print("=" * 50)
 
     async with AsyncSessionLocal() as session:
         # --- LINK 1: THE REPOSITORY ---
@@ -32,7 +34,7 @@ async def main():
         service = FAQService(db=session)
 
         # Check if service actually created the repo
-        if hasattr(service, 'repo') and service.repo:
+        if hasattr(service, "repo") and service.repo:
             print("    ✅ Service has initialized Repository.")
         else:
             print("    ❌ Service failed to initialize Repository.")
@@ -70,6 +72,7 @@ async def main():
         print("    👉 Testing full process()...")
         response = await agent.process({"message": "How do I open an account?"})
         print(f"    ✅ Final Output Source: {response.metadata.get('source')}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

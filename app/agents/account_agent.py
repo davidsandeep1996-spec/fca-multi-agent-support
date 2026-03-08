@@ -5,17 +5,27 @@ from langfuse import observe
 from app.agents.base import BaseAgent, AgentConfig, AgentResponse
 from app.services import AccountService, CustomerService, TransactionService
 
+
 class AccountAgent(BaseAgent):
-    def __init__(self, config: Optional[AgentConfig] = None
-                 ,account_service: AccountService = None,
+    def __init__(
+        self,
+        config: Optional[AgentConfig] = None,
+        account_service: AccountService = None,
         customer_service: CustomerService = None,
         transaction_service: TransactionService = None,
-        **kwargs):
+        **kwargs,
+    ):
         super().__init__(name="account_agent", config=config)
         self.client = AsyncGroq(api_key=self.config.api_key)
 
-        if account_service is None or customer_service is None or transaction_service is None:
-            raise ValueError("AccountAgent requires DB-backed services (inject AccountService/CustomerService/TransactionService).")
+        if (
+            account_service is None
+            or customer_service is None
+            or transaction_service is None
+        ):
+            raise ValueError(
+                "AccountAgent requires DB-backed services (inject AccountService/CustomerService/TransactionService)."
+            )
 
         self.account_service = account_service
         self.customer_service = customer_service
@@ -50,7 +60,7 @@ class AccountAgent(BaseAgent):
     def _friendly_account_type(self, acct_type: Any) -> str:
         """Map database Enum values to professional banking names."""
         # Convert Enum or string to lowercase string key
-        key = str(acct_type).lower().split('.')[-1] if acct_type else ""
+        key = str(acct_type).lower().split(".")[-1] if acct_type else ""
 
         mapping = {
             "current": "Standard Current Account",
@@ -59,7 +69,7 @@ class AccountAgent(BaseAgent):
             "credit": "Platinum Credit Card",
             "active": "Active",
             "frozen": "Frozen",
-            "closed": "Closed"
+            "closed": "Closed",
         }
         return mapping.get(key, "General Account")
 
@@ -70,7 +80,7 @@ class AccountAgent(BaseAgent):
         if isinstance(date_val, str):
             try:
                 # Attempt to parse ISO string
-                date_val = datetime.fromisoformat(date_val.replace('Z', '+00:00'))
+                date_val = datetime.fromisoformat(date_val.replace("Z", "+00:00"))
             except Exception as e:
                 self.logger.warning(f"Date parsing error: {e}")
                 return date_val
@@ -97,7 +107,14 @@ class AccountAgent(BaseAgent):
             async with self.customer_service as cust_svc:
                 async with self.account_service as acct_svc:
                     async with self.transaction_service as txn_svc:
-                        result = await self._fetch_real_data(cust_svc, acct_svc, txn_svc, customer_id, query_type, message)
+                        result = await self._fetch_real_data(
+                            cust_svc,
+                            acct_svc,
+                            txn_svc,
+                            customer_id,
+                            query_type,
+                            message,
+                        )
             response = self.create_response(
                 content=result["response"],
                 metadata={
@@ -120,38 +137,67 @@ class AccountAgent(BaseAgent):
 
     def _determine_query_type(self, message: str) -> str:
 
-
         message_lower = self._extract_clean_message(message)
-
 
         # These words imply the user wants to know a RULE, not a NUMBER.
         policy_triggers = [
-            "can i", "may i", "allowed to", "rules", "policy", "limit",
-            "fee", "charge", "penalty", "interest rate", "terms",
-            "overpay", "close", "open", "switch", "transfer limit",
-            "how do i", "procedure"
+            "can i",
+            "may i",
+            "allowed to",
+            "rules",
+            "policy",
+            "limit",
+            "fee",
+            "charge",
+            "penalty",
+            "interest rate",
+            "terms",
+            "overpay",
+            "close",
+            "open",
+            "switch",
+            "transfer limit",
+            "how do i",
+            "procedure",
         ]
 
         # If it contains a policy trigger, kick it to 'general' (RAG)
         # UNLESS it is a direct data request like "What is my overdraft limit?"
         if any(trigger in message_lower for trigger in policy_triggers):
-             # Exception: Keep it if they explicitly ask for their specific balance/limit value
-             if "balance" not in message_lower and "available" not in message_lower:
-                 return "general"
+            # Exception: Keep it if they explicitly ask for their specific balance/limit value
+            if "balance" not in message_lower and "available" not in message_lower:
+                return "general"
 
-
-        if any(word in message_lower for word in ["balance", "how much", "account total", "have"]):
+        if any(
+            word in message_lower
+            for word in ["balance", "how much", "account total", "have"]
+        ):
             return "balance"
-        elif any(word in message_lower for word in ["transaction", "history", "recent", "activity"]):
+        elif any(
+            word in message_lower
+            for word in ["transaction", "history", "recent", "activity"]
+        ):
             return "transactions"
-        elif any(word in message_lower for word in ["statement", "download", "pdf", "email"]):
+        elif any(
+            word in message_lower for word in ["statement", "download", "pdf", "email"]
+        ):
             return "statement"
-        elif any(word in message_lower for word in ["details", "information", "account info"]):
+        elif any(
+            word in message_lower for word in ["details", "information", "account info"]
+        ):
             return "details"
         else:
             return "general"
 
-    async def _fetch_real_data(self, cust_svc, acct_svc, txn_svc, customer_id: int, query_type: str, message: str) -> Dict[str, Any]:
+    async def _fetch_real_data(
+        self,
+        cust_svc,
+        acct_svc,
+        txn_svc,
+        customer_id: int,
+        query_type: str,
+        message: str,
+    ) -> Dict[str, Any]:
         """
         Fetch real data from database services.
         """
@@ -159,7 +205,11 @@ class AccountAgent(BaseAgent):
             # 1) Customer lookup uses INTERNAL PK (customers.id: int)
             customer = await cust_svc.get_customer(customer_id)
             if not customer:
-                return {"response": f"Customer {customer_id} not found", "data": {}, "data_points": []}
+                return {
+                    "response": f"Customer {customer_id} not found",
+                    "data": {},
+                    "data_points": [],
+                }
 
             # 2) Accounts lookup uses EXTERNAL customer id (accounts.customer_id: varchar)
             external_customer_id = getattr(customer, "customer_id", None)
@@ -174,7 +224,9 @@ class AccountAgent(BaseAgent):
             def _account_summary(acct):
                 return {
                     "account_number": getattr(acct, "account_number", None),
-                    "type": getattr(acct, "type", None),  # <-- real column name is `type`
+                    "type": getattr(
+                        acct, "type", None
+                    ),  # <-- real column name is `type`
                     "status": getattr(acct, "status", None),
                     "balance": float(getattr(acct, "balance", 0.0) or 0.0),
                     "created_at": getattr(acct, "created_at", None),
@@ -212,29 +264,45 @@ class AccountAgent(BaseAgent):
 
                 return {
                     "response": response,
-                    "data": {"balance": balance, "account_number": acct_num, "type": acct_type},
+                    "data": {
+                        "balance": balance,
+                        "account_number": acct_num,
+                        "type": acct_type,
+                    },
                     "data_points": ["balance", "account_number", "type"],
                 }
 
             elif query_type == "transactions":
                 accounts = await acct_svc.get_accounts_by_customer(external_customer_id)
                 if not accounts:
-                    return {"response": f"No accounts found for customer {customer_id}", "data": {}, "data_points": []}
+                    return {
+                        "response": f"No accounts found for customer {customer_id}",
+                        "data": {},
+                        "data_points": [],
+                    }
 
                 acct = accounts[0]
                 account_id = getattr(acct, "id", None)
                 if account_id is None:
-                    return {"response": "Account record missing id", "data": {}, "data_points": []}
+                    return {
+                        "response": "Account record missing id",
+                        "data": {},
+                        "data_points": [],
+                    }
 
                 # Note: this service actually expects account_id (despite method name) in your codebase
-                all_transactions = await txn_svc.get_transactions_by_account(account_id, limit=10)
+                all_transactions = await txn_svc.get_transactions_by_account(
+                    account_id, limit=10
+                )
                 transactions = all_transactions[:5]
 
                 response = "Here are your 5 most recent transactions:\n\n"
                 for i, txn in enumerate(transactions, 1):
-                    desc = getattr(txn, 'description', 'Transaction')
-                    amt = float(getattr(txn, 'amount', 0.0) or 0.0)
-                    date_obj = getattr(txn, 'date', None) or getattr(txn, 'transaction_date', None)
+                    desc = getattr(txn, "description", "Transaction")
+                    amt = float(getattr(txn, "amount", 0.0) or 0.0)
+                    date_obj = getattr(txn, "date", None) or getattr(
+                        txn, "transaction_date", None
+                    )
 
                     date_str = self._friendly_date(date_obj)
                     formatted_amt = self._format_currency(amt)
@@ -277,23 +345,34 @@ class AccountAgent(BaseAgent):
 
                 return {
                     "response": response,
-                    "data": {"account_number": account_number, "email": getattr(customer, "email", None)},
+                    "data": {
+                        "account_number": account_number,
+                        "email": getattr(customer, "email", None),
+                    },
                     "data_points": ["statement_generated", "email", "account_number"],
                 }
 
             elif query_type == "details":
                 accounts = await acct_svc.get_accounts_by_customer(external_customer_id)
                 if not accounts:
-                    return {"response": f"No accounts found for customer {customer_id}", "data": {}, "data_points": []}
+                    return {
+                        "response": f"No accounts found for customer {customer_id}",
+                        "data": {},
+                        "data_points": [],
+                    }
 
                 acct = accounts[0]
                 acct_num = getattr(acct, "account_number", None)
                 acct_type = getattr(acct, "type", None)
-                created_at = getattr(acct, "created_at", None)  # prefer created_at over created_date
+                created_at = getattr(
+                    acct, "created_at", None
+                )  # prefer created_at over created_date
 
                 friendly_type = self._friendly_account_type(acct_type)
-                formatted_bal = self._format_currency(float(getattr(acct, 'balance', 0.0)))
-                status = self._friendly_account_type(getattr(acct, 'status', 'Active'))
+                formatted_bal = self._format_currency(
+                    float(getattr(acct, "balance", 0.0))
+                )
+                status = self._friendly_account_type(getattr(acct, "status", "Active"))
                 open_date = self._friendly_date(created_at)
 
                 response = (
@@ -312,7 +391,13 @@ class AccountAgent(BaseAgent):
                         "status": getattr(acct, "status", None),
                         "created_at": created_at,
                     },
-                    "data_points": ["account_number", "type", "balance", "status", "created_at"],
+                    "data_points": [
+                        "account_number",
+                        "type",
+                        "balance",
+                        "status",
+                        "created_at",
+                    ],
                 }
 
             else:
@@ -326,4 +411,8 @@ class AccountAgent(BaseAgent):
 
         except Exception as e:
             self.logger.error(f"Error fetching real data: {e}")
-            return {"response": f"Error retrieving account information: {str(e)}", "data": {}, "data_points": []}
+            return {
+                "response": f"Error retrieving account information: {str(e)}",
+                "data": {},
+                "data_points": [],
+            }

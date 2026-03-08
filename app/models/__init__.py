@@ -5,7 +5,7 @@ This module provides base model classes and common utilities
 for all database models in the application.
 """
 
-from datetime import datetime,timezone
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, DateTime, Boolean
 from typing import Any
 
@@ -15,6 +15,7 @@ from app.database import Base
 # ============================================================================
 # TIMESTAMP MIXIN
 # ============================================================================
+
 
 class TimestampMixin:
     """
@@ -42,6 +43,7 @@ class TimestampMixin:
 # ============================================================================
 # SOFT DELETE MIXIN
 # ============================================================================
+
 
 class SoftDeleteMixin:
     """
@@ -79,6 +81,7 @@ class SoftDeleteMixin:
 # ============================================================================
 # BASE MODEL
 # ============================================================================
+
 
 class BaseModel(Base, TimestampMixin):
     """
@@ -169,7 +172,11 @@ class BaseModel(Base, TimestampMixin):
 
 # ruff: noqa: E402
 from app.models.customer import Customer
-from app.models.conversation import Conversation, ConversationStatus, ConversationChannel
+from app.models.conversation import (
+    Conversation,
+    ConversationStatus,
+    ConversationChannel,
+)
 from app.models.message import Message, MessageRole
 from app.models.product import Product
 from app.models.account import Account, AccountType, AccountStatus
@@ -190,5 +197,5 @@ __all__ = [
     "Account",
     "AccountType",
     "AccountStatus",
-    "Transaction"
+    "Transaction",
 ]

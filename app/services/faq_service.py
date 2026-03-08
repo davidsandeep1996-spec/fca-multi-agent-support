@@ -1,11 +1,13 @@
 """
 FAQ Service
 """
+
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.base import BaseService
 from app.repositories.faq import FAQRepository
 from app.models.faq import FAQ
+
 
 class FAQService(BaseService):
     def __init__(self, db: AsyncSession = None):

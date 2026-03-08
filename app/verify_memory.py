@@ -2,6 +2,7 @@
 VERIFY MEMORY & CONTEXT
 Tests if the agent remembers previous turns (Sliding Window Memory).
 """
+
 import asyncio
 import logging
 import sys
@@ -11,10 +12,11 @@ from app.database import check_db_connection
 # Configure Logging
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
+
 async def main():
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("🧠 MEMORY & CONTEXT TEST")
-    print("="*60)
+    print("=" * 60)
 
     # 1. Check DB
     if not await check_db_connection():
@@ -32,9 +34,7 @@ async def main():
     msg_1 = "I want to inquire about a Personal Loan"
 
     result_1 = await coordinator.process_message(
-        message=msg_1,
-        customer_id=customer_id,
-        conversation_id=conversation_id
+        message=msg_1, customer_id=customer_id, conversation_id=conversation_id
     )
 
     print(f"   🤖 Agent: {result_1['agent']}")
@@ -48,9 +48,7 @@ async def main():
     msg_2 = "What is the interest rate for that?"
 
     result_2 = await coordinator.process_message(
-        message=msg_2,
-        customer_id=customer_id,
-        conversation_id=conversation_id
+        message=msg_2, customer_id=customer_id, conversation_id=conversation_id
     )
 
     print(f"   🤖 Agent: {result_2['agent']}")
@@ -58,14 +56,19 @@ async def main():
     print(f"   📄 Response: {result_2['response'][:50]}...")
 
     # --- VERIFICATION ---
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("RESULTS:")
 
     # Check if Turn 2 was classified as 'loan_inquiry' (Success) or 'general_inquiry' (Fail)
-    if result_2['intent'] in ['loan_inquiry', 'product_inquiry']:
-        print("✅ PASS: System remembered context! 'That' was correctly linked to Loans.")
+    if result_2["intent"] in ["loan_inquiry", "product_inquiry"]:
+        print(
+            "✅ PASS: System remembered context! 'That' was correctly linked to Loans."
+        )
     else:
-        print(f"❌ FAIL: System lost context. Classified as '{result_2['intent']}' instead of loan/product.")
+        print(
+            f"❌ FAIL: System lost context. Classified as '{result_2['intent']}' instead of loan/product."
+        )
+
 
 if __name__ == "__main__":
     asyncio.run(main())

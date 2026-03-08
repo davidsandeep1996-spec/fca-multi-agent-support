@@ -2,16 +2,18 @@
 DEBUG SCRIPT: FAQ Data Layer
 Usage: docker compose exec web python -m app.debug_faq
 """
+
 import asyncio
 from sqlalchemy import select, text
 from app.database import AsyncSessionLocal
 from app.models.faq import FAQ
 from app.repositories.faq import FAQRepository
 
+
 async def main():
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print("🐞 FAQ DATA FORENSICS")
-    print("="*50)
+    print("=" * 50)
 
     async with AsyncSessionLocal() as session:
         # TEST 1: RAW SQL COUNT
@@ -52,10 +54,13 @@ async def main():
         results_full = await repo.search(query)
 
         if results_full:
-             print("   ✅ FOUND match!")
+            print("   ✅ FOUND match!")
         else:
-             print("   ❌ SEARCH FAILED for full sentence.")
-             print("   👉 Diagnosis: The search logic (ilike) might be too strict for full sentences.")
+            print("   ❌ SEARCH FAILED for full sentence.")
+            print(
+                "   👉 Diagnosis: The search logic (ilike) might be too strict for full sentences."
+            )
+
 
 if __name__ == "__main__":
     asyncio.run(main())

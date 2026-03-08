@@ -20,10 +20,7 @@ class ConversationRepository(BaseRepository[Conversation]):
         super().__init__(Conversation, db)
 
     async def get_by_customer(
-        self,
-        customer_id: int,
-        skip: int = 0,
-        limit: int = 100
+        self, customer_id: int, skip: int = 0, limit: int = 100
     ) -> List[Conversation]:
         """
         Get conversations for customer.
@@ -46,9 +43,7 @@ class ConversationRepository(BaseRepository[Conversation]):
         return result.scalars().all()
 
     async def get_active_conversations(
-        self,
-        skip: int = 0,
-        limit: int = 100
+        self, skip: int = 0, limit: int = 100
     ) -> List[Conversation]:
         """
         Get active conversations.
@@ -70,9 +65,7 @@ class ConversationRepository(BaseRepository[Conversation]):
         return result.scalars().all()
 
     async def get_escalated_conversations(
-        self,
-        skip: int = 0,
-        limit: int = 100
+        self, skip: int = 0, limit: int = 100
     ) -> List[Conversation]:
         """
         Get escalated conversations.
@@ -92,6 +85,7 @@ class ConversationRepository(BaseRepository[Conversation]):
             .order_by(Conversation.updated_at.asc())  # Oldest first
         )
         return result.scalars().all()
+
     async def get_by_ticket_id(self, ticket_id: str) -> Optional[Conversation]:
         """
         [NEW] Fast lookup for when a customer quotes their ticket number.
@@ -106,10 +100,14 @@ class ConversationRepository(BaseRepository[Conversation]):
         [NEW] Dashboard view for specific teams.
         Example: repo.get_escalated_by_group("Security & Fraud Team")
         """
-        query = select(self.model).where(
-            self.model.status == ConversationStatus.ESCALATED,
-            self.model.assigned_group == assigned_group
-        ).order_by(self.model.updated_at.desc()) # Show newest first
+        query = (
+            select(self.model)
+            .where(
+                self.model.status == ConversationStatus.ESCALATED,
+                self.model.assigned_group == assigned_group,
+            )
+            .order_by(self.model.updated_at.desc())
+        )  # Show newest first
 
         result = await self.session.execute(query)
         return result.scalars().all()

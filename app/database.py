@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
 )
 from sqlalchemy.orm import declarative_base
-from sqlalchemy import  text  # Add 'text' here
+from sqlalchemy import text  # Add 'text' here
 
 from typing import AsyncGenerator
 import logging
@@ -61,6 +61,7 @@ Base = declarative_base()
 # ============================================================================
 # SESSION DEPENDENCY
 # ============================================================================
+
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
@@ -123,6 +124,7 @@ async def close_db() -> None:
 # ============================================================================
 # DATABASE HEALTH CHECK
 # ============================================================================
+
 
 async def check_db_connection() -> bool:
     """

@@ -8,6 +8,7 @@ import logging
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from app.api.routes.messages import coordinator
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
@@ -16,22 +17,27 @@ router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 # MODELS
 # ============================================================================
 
+
 class SeedRequest(BaseModel):
     """Request to seed database."""
+
     clear_first: bool = False
     customer_count: int = 100  # Allow custom customer count
 
 
 class SeedResponse(BaseModel):
     """Response from seeding."""
+
     status: str
     message: str
+
 
 # Add Model for Intervention/Approval
 class InterventionRequest(BaseModel):
     """
     Request to approve/modify a paused agent action.
     """
+
     conversation_id: int
     approved_response: str
 
@@ -39,6 +45,7 @@ class InterventionRequest(BaseModel):
 # ============================================================================
 # ENDPOINTS
 # ============================================================================
+
 
 @router.post("/seed-db", response_model=SeedResponse)
 async def seed_database(request: SeedRequest, background_tasks: BackgroundTasks):
@@ -72,9 +79,7 @@ async def seed_database(request: SeedRequest, background_tasks: BackgroundTasks)
 
         # Run seeding in background
         background_tasks.add_task(
-            seed_all,
-            clear_first=request.clear_first,
-            customer_count=customer_count
+            seed_all, clear_first=request.clear_first, customer_count=customer_count
         )
 
         action = "Clearing database and seeding" if request.clear_first else "Seeding"
@@ -82,24 +87,21 @@ async def seed_database(request: SeedRequest, background_tasks: BackgroundTasks)
         return SeedResponse(
             status="started",
             message=f"{action} started with {customer_count} customers. "
-                    f"This will generate ~{customer_count * 40:,} total records. Check logs for progress."
+            f"This will generate ~{customer_count * 40:,} total records. Check logs for progress.",
         )
 
     except Exception as e:
         logger.error(f"Failed to start seeding: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to start seeding: {str(e)}"
+            status_code=500, detail=f"Failed to start seeding: {str(e)}"
         )
 
 
 @router.get("/health")
 async def health_check():
     """Simple health check endpoint."""
-    return {
-        "status": "healthy",
-        "message": "Admin API is operational"
-    }
+    return {"status": "healthy", "message": "Admin API is operational"}
+
 
 #  Add Endpoint to Approve & Resume
 @router.post("/interventions/approve")
@@ -115,13 +117,13 @@ async def approve_intervention(request: InterventionRequest):
         # Call the coordinator method we added in the previous step
         result = await coordinator.approve_intervention(
             conversation_id=request.conversation_id,
-            new_response=request.approved_response
+            new_response=request.approved_response,
         )
 
         return {
             "status": "resumed",
             "message": "Workflow resumed successfully",
-            "final_response": result
+            "final_response": result,
         }
     except Exception as e:
         logger.error(f"Failed to approve intervention: {e}")
@@ -141,5 +143,5 @@ async def get_pending_interventions():
     # In a real production app using PostgresSaver, you would query the checkpoints table.
     return {
         "message": "To view pending interventions, check conversations with status='paused' in the database.",
-        "count": "Unknown (Requires DB persistence layer for checkpoints)"
+        "count": "Unknown (Requires DB persistence layer for checkpoints)",
     }

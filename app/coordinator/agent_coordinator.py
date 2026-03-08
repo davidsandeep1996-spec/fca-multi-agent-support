@@ -18,15 +18,16 @@ from app.workflows.message_workflow import MessageWorkflow
 from app.services.rag_service import RAGService
 from app.database import AsyncSessionLocal
 from app.services import (
-            AccountService,
-            CustomerService,
-            ProductService,
-            ConversationService,
-            TransactionService,
-            FAQService,
-            MessageService
-        )
+    AccountService,
+    CustomerService,
+    ProductService,
+    ConversationService,
+    TransactionService,
+    FAQService,
+    MessageService,
+)
 from app.models.message import MessageRole
+
 
 class ConversationMessage(BaseModel):
     """Single message in conversation."""
@@ -38,7 +39,6 @@ class ConversationMessage(BaseModel):
     intent: str
     confidence: float
     timestamp: datetime = Field(default_factory=datetime.utcnow)
-
 
 
 class ConversationContext(BaseModel):
@@ -120,18 +120,18 @@ class AgentCoordinator:
     - Persistence
     """
 
-    def __init__(self,
-    account_service=None,
-    customer_service=None,
-    product_service=None,
-    conversation_service=None,
-                 ):
+    def __init__(
+        self,
+        account_service=None,
+        customer_service=None,
+        product_service=None,
+        conversation_service=None,
+    ):
         """Initialize coordinator."""
         self.logger = logging.getLogger(__name__)
         self.conversations: Dict[int, ConversationContext] = {}
 
-            # Initialize services
-
+        # Initialize services
 
         self.account_service = account_service or AccountService()
         self.customer_service = customer_service or CustomerService()
@@ -140,11 +140,7 @@ class AgentCoordinator:
         self.transaction_service = TransactionService()
         self.faq_service = FAQService()
 
-
-
         self.checkpointer = MemorySaver()
-
-
 
         self.security_service = SecurityService()
 
@@ -166,8 +162,11 @@ class AgentCoordinator:
             )
 
         return self.conversations[conversation_id]
+
     @observe(name="AgentCoordinator")
-    async def process_message(self, message: str, customer_id: int, conversation_id: int, context=None):
+    async def process_message(
+        self, message: str, customer_id: int, conversation_id: int, context=None
+    ):
 
         sanitized_message = self.security_service.sanitize_input(message)
 
@@ -194,20 +193,18 @@ class AgentCoordinator:
                     content = getattr(msg, "content", "")
                 # Map 'customer' -> 'user' for the LLM
                 role = "user" if role_raw in ["customer", "user"] else "assistant"
-                history.append({
-                    "role": role,
-                    "content": content
-                })
+                history.append({"role": role, "content": content})
         if context is None:
             context = {}
-
 
         # Ensure Conversation Exists in DB before saving messages
         async with AsyncSessionLocal() as session:
             conv_svc = ConversationService(db=session)
             existing_conv = await conv_svc.get_conversation(conversation_id)
             if not existing_conv:
-                self.logger.info(f"🆕 Creating new conversation {conversation_id} in DB")
+                self.logger.info(
+                    f"🆕 Creating new conversation {conversation_id} in DB"
+                )
                 # Auto-create if missing (e.g., first message in new chat)
                 # Note: We assume customer_id exists. If not, this might fail,
                 # but usually customer is validated upstream (Auth).
@@ -215,11 +212,13 @@ class AgentCoordinator:
                     new_conv = await conv_svc.start_conversation(
                         customer_id=customer_id,
                         title="New Conversation",
-                        channel="web" # or ConversationChannel.WEB
+                        channel="web",  # or ConversationChannel.WEB
                     )
                     await session.commit()
                     conversation_id = new_conv.id
-                    self.logger.info(f"✅ Created conversation {conversation_id} for customer {customer_id}")
+                    self.logger.info(
+                        f"✅ Created conversation {conversation_id} for customer {customer_id}"
+                    )
                 except Exception as e:
                     self.logger.warning(f"Could not auto-create conversation: {e}")
                     await session.rollback()
@@ -232,7 +231,7 @@ class AgentCoordinator:
                     conversation_id=conversation_id,
                     role=MessageRole.CUSTOMER,
                     content=sanitized_message,
-                    intent=None
+                    intent=None,
                 )
                 await session.commit()
             except Exception as e:
@@ -249,19 +248,19 @@ class AgentCoordinator:
                 conversation_service=ConversationService(db=session),
                 faq_service=FAQService(db=session),
                 rag_service=RAGService(),
-                checkpointer=self.checkpointer
+                checkpointer=self.checkpointer,
             )
 
             # IMPORTANT: update context with the db-backed services (not self.*)
-            #context.update({
-             #   "account_service": AccountService(),
-              #  "customer_service": CustomerService(),
-               # "transaction_service": TransactionService(),
-                #"product_service": ProductService(),
-                # keep these only if they exist and are DB-safe in your project:
-                # "compliance_service": ...,
-               # "conversation_service": ConversationService(),
-           #})
+            # context.update({
+            #   "account_service": AccountService(),
+            #  "customer_service": CustomerService(),
+            # "transaction_service": TransactionService(),
+            # "product_service": ProductService(),
+            # keep these only if they exist and are DB-safe in your project:
+            # "compliance_service": ...,
+            # "conversation_service": ConversationService(),
+            # })
 
             # IMPORTANT: call the local workflow, not self.workflow
             workflow_response = await workflow.process_message(
@@ -283,8 +282,12 @@ class AgentCoordinator:
             # ... allow normal saving of this response ...
 
         # everything below stays the same (uses workflow_response)
-        agent_type = workflow_response.get("agent","system")
-        response_text = workflow_response.get("message") or workflow_response.get("response") or "Processing..."
+        agent_type = workflow_response.get("agent", "system")
+        response_text = (
+            workflow_response.get("message")
+            or workflow_response.get("response")
+            or "Processing..."
+        )
         intent = workflow_response.get("intent")
         confidence = workflow_response.get("confidence", 0.0)
 
@@ -298,7 +301,7 @@ class AgentCoordinator:
                     content=response_text,
                     agent_name=agent_type,
                     intent=intent,
-                    confidence_score=int(confidence * 100) if confidence else 0
+                    confidence_score=int(confidence * 100) if confidence else 0,
                 )
                 await session.commit()
             except Exception as e:
@@ -318,9 +321,9 @@ class AgentCoordinator:
             conv_context.mark_escalated(escalation_id)
             self.logger.info(f"⚠️ Escalation detected: {escalation_id}")
 
-
-        self.logger.info(f"✅ Message processed: {agent_type} agent, turn #{len(conv_context.messages)}")
-
+        self.logger.info(
+            f"✅ Message processed: {agent_type} agent, turn #{len(conv_context.messages)}"
+        )
 
         return {
             "response": response_text,
@@ -334,8 +337,6 @@ class AgentCoordinator:
             "status": workflow_response.get("status") or "success",
             "metadata": workflow_response.get("metadata", {}),
         }
-
-
 
     # ========================================================================
     # PERSISTENCE & RETRIEVAL
@@ -359,7 +360,8 @@ class AgentCoordinator:
     def get_all_conversations(self, customer_id: int) -> List[ConversationContext]:
         """Get all conversations for a customer."""
         return [
-            conv for conv in self.conversations.values()
+            conv
+            for conv in self.conversations.values()
             if conv.customer_id == customer_id
         ]
 
@@ -372,13 +374,15 @@ class AgentCoordinator:
         escalated = []
         for conv in self.conversations.values():
             if conv.is_escalated:
-                escalated.append({
-                    "conversation_id": conv.conversation_id,
-                    "customer_id": conv.customer_id,
-                    "escalation_id": conv.escalation_id,
-                    "message_count": len(conv.messages),
-                    "created_at": conv.created_at.isoformat(),
-                })
+                escalated.append(
+                    {
+                        "conversation_id": conv.conversation_id,
+                        "customer_id": conv.customer_id,
+                        "escalation_id": conv.escalation_id,
+                        "message_count": len(conv.messages),
+                        "created_at": conv.created_at.isoformat(),
+                    }
+                )
         return escalated
 
     def resolve_escalation(
@@ -399,12 +403,9 @@ class AgentCoordinator:
 
     def get_statistics(self) -> Dict[str, Any]:
         """Get coordination statistics."""
-        total_messages = sum(
-            len(conv.messages) for conv in self.conversations.values()
-        )
+        total_messages = sum(len(conv.messages) for conv in self.conversations.values())
         escalated_count = sum(
-            1 for conv in self.conversations.values()
-            if conv.is_escalated
+            1 for conv in self.conversations.values() if conv.is_escalated
         )
 
         # Agent distribution
@@ -428,8 +429,7 @@ class AgentCoordinator:
             "agent_distribution": agent_counts,
             "intent_distribution": intent_counts,
             "avg_messages_per_conversation": (
-                total_messages / len(self.conversations)
-                if self.conversations else 0
+                total_messages / len(self.conversations) if self.conversations else 0
             ),
         }
 
@@ -449,7 +449,9 @@ class AgentCoordinator:
             ],
         }
 
-    async def stream_message(self, message: str, customer_id: int, conversation_id: int, context=None):
+    async def stream_message(
+        self, message: str, customer_id: int, conversation_id: int, context=None
+    ):
         """
         Stream conversation updates (Server-Sent Events).
         Yields: Dicts with 'type', 'step', and 'content'.
@@ -478,16 +480,18 @@ class AgentCoordinator:
                 conversation_service=conversation_svc,
                 faq_service=faq_svc,
                 rag_service=RAGService(),
-                )
+            )
 
             # Update Context
-            context.update({
-                "account_service": account_svc,
-                "customer_service": customer_svc,
-                "transaction_service": transaction_svc,
-                "product_service": product_svc,
-                "conversation_service": conversation_svc,
-            })
+            context.update(
+                {
+                    "account_service": account_svc,
+                    "customer_service": customer_svc,
+                    "transaction_service": transaction_svc,
+                    "product_service": product_svc,
+                    "conversation_service": conversation_svc,
+                }
+            )
 
             # Track final state for persistence
             final_response_text = ""
@@ -506,7 +510,7 @@ class AgentCoordinator:
                     yield {
                         "type": "status",
                         "step": "intent",
-                        "content": f"Identified intent: {final_intent}"
+                        "content": f"Identified intent: {final_intent}",
                     }
 
                 # --- EVENT: Agent Working ---
@@ -516,15 +520,15 @@ class AgentCoordinator:
                     yield {
                         "type": "status",
                         "step": "processing",
-                        "content": f"{node_name.capitalize()} Agent is processing..."
+                        "content": f"{node_name.capitalize()} Agent is processing...",
                     }
 
                 # --- EVENT: Compliance Check ---
                 elif node_name == "compliance":
-                     yield {
+                    yield {
                         "type": "status",
                         "step": "compliance",
-                        "content": "Verifying FCA compliance..."
+                        "content": "Verifying FCA compliance...",
                     }
 
                 # --- EVENT: Final Response ---
@@ -540,7 +544,7 @@ class AgentCoordinator:
                         "type": "response",
                         "content": final_response_text,
                         "metadata": final_data.get("metadata"),
-                        "conversation_id": conversation_id
+                        "conversation_id": conversation_id,
                     }
 
             # 3. Persistence (Save to Memory & DB)
@@ -558,43 +562,58 @@ class AgentCoordinator:
 
             self.logger.info(f"✅ Stream complete: {final_agent} agent")
 
-
-    async def get_db_conversation_history(self, conversation_id: int, limit: int = 50) -> List[Dict[str, Any]]:
+    async def get_db_conversation_history(
+        self, conversation_id: int, limit: int = 50
+    ) -> List[Dict[str, Any]]:
         """
         Fetch conversation history from the Database.
         """
         async with AsyncSessionLocal() as session:
             msg_service = MessageService(db=session)
-            self.logger.info(f"🔍 Querying DB for History of Conversation {conversation_id}")
+            self.logger.info(
+                f"🔍 Querying DB for History of Conversation {conversation_id}"
+            )
 
-            messages = await msg_service.get_conversation_messages(conversation_id, page_size=limit)
+            messages = await msg_service.get_conversation_messages(
+                conversation_id, page_size=limit
+            )
 
-            self.logger.info(f"🔍 DB Returned {len(messages)} messages for ID {conversation_id}")
+            self.logger.info(
+                f"🔍 DB Returned {len(messages)} messages for ID {conversation_id}"
+            )
 
             # Convert SQLAlchemy models to clean dicts
             history = []
             for msg in messages:
                 # Handle potential Enum or String for role
-                role_str = msg.role.value if hasattr(msg.role, 'value') else str(msg.role)
+                role_str = (
+                    msg.role.value if hasattr(msg.role, "value") else str(msg.role)
+                )
 
                 # Normalization (optional but recommended)
                 if role_str == "customer":
                     role_str = "user"
 
-                history.append({
-                    "id": msg.id,
-                    "role": role_str,
-                    "content": msg.content,
-                    "agent_name": msg.agent_name,
-                    "intent": msg.intent,
-                    "timestamp": msg.created_at.isoformat() if msg.created_at else None
-                })
+                history.append(
+                    {
+                        "id": msg.id,
+                        "role": role_str,
+                        "content": msg.content,
+                        "agent_name": msg.agent_name,
+                        "intent": msg.intent,
+                        "timestamp": msg.created_at.isoformat()
+                        if msg.created_at
+                        else None,
+                    }
+                )
 
             # Sort by ID or Timestamp (Ascending = Chronological)
             history.sort(key=lambda x: x["timestamp"] or "")
             return history
 
-    async def get_db_customer_conversations(self, customer_id: int) -> List[Dict[str, Any]]:
+    async def get_db_customer_conversations(
+        self, customer_id: int
+    ) -> List[Dict[str, Any]]:
         """
         Fetch all conversations for a customer from Database.
         """
@@ -606,18 +625,21 @@ class AgentCoordinator:
                 {
                     "conversation_id": c.id,
                     "title": c.title,
-                    "status": c.status.value if hasattr(c.status, 'value') else str(c.status),
+                    "status": c.status.value
+                    if hasattr(c.status, "value")
+                    else str(c.status),
                     "created_at": c.created_at.isoformat(),
                     "message_count": c.message_count,
-                    "last_updated": c.updated_at.isoformat() if c.updated_at else ""
+                    "last_updated": c.updated_at.isoformat() if c.updated_at else "",
                 }
                 for c in conversations
             ]
 
     # Approve/Resume Workflow
 
-
-    async def approve_intervention(self, conversation_id: int, new_response: str) -> Dict[str, Any]:
+    async def approve_intervention(
+        self, conversation_id: int, new_response: str
+    ) -> Dict[str, Any]:
         """
         Admin approves (and edits) the response, then resumes the graph.
         """
@@ -631,13 +653,13 @@ class AgentCoordinator:
             product_service=ProductService(),
             conversation_service=ConversationService(),
             faq_service=FAQService(),
-            checkpointer=self.checkpointer
+            checkpointer=self.checkpointer,
         )
 
         # [FIX] Fetch current state to satisfy Pydantic validation requirements
         snapshot = workflow_wrapper.workflow.get_state(config)
         if not snapshot.values:
-             raise ValueError(f"No state found for conversation {conversation_id}")
+            raise ValueError(f"No state found for conversation {conversation_id}")
 
         # Merge existing state with our updates
         # Ensure we work with a dictionary
@@ -649,17 +671,16 @@ class AgentCoordinator:
 
         # Create full payload (Original State + Updates)
         update_payload = current_state.copy()
-        update_payload.update({
-            "agent_response": new_response,
-            "is_compliant": True,
-            "required_disclaimers": []
-        })
+        update_payload.update(
+            {
+                "agent_response": new_response,
+                "is_compliant": True,
+                "required_disclaimers": [],
+            }
+        )
 
         # 2. Update State (Now passing FULL object)
-        workflow_wrapper.workflow.update_state(
-            config,
-            update_payload
-        )
+        workflow_wrapper.workflow.update_state(config, update_payload)
 
         self.logger.info(f"✅ Admin updated state for {conversation_id}. Resuming...")
 
@@ -676,7 +697,7 @@ class AgentCoordinator:
                 content=response_data.get("message"),
                 agent_name=response_data.get("agent"),
                 intent=response_data.get("intent"),
-                confidence_score=99
+                confidence_score=99,
             )
 
         return response_data

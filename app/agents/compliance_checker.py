@@ -100,12 +100,17 @@ class ComplianceCheckerAgent(BaseAgent):
             "Regulatory guidance",
         ]
 
-    def _filter_contextual_false_positives(self, content_lower: str, issues: List[str]) -> List[str]:
+    def _filter_contextual_false_positives(
+        self, content_lower: str, issues: List[str]
+    ) -> List[str]:
         """Helper to remove false positives like 'not guaranteed'."""
         filtered = []
         for issue in issues:
             # Ignore if the bot explicitly said it is NOT guaranteed
-            if "guaranteed" in issue and ("not guaranteed" in content_lower or "no loan is guaranteed" in content_lower):
+            if "guaranteed" in issue and (
+                "not guaranteed" in content_lower
+                or "no loan is guaranteed" in content_lower
+            ):
                 continue
             filtered.append(issue)
         return filtered
@@ -260,14 +265,12 @@ class ComplianceCheckerAgent(BaseAgent):
 
         langfuse = get_client()
         langfuse.update_current_generation(
-            model=self.config.model_name,
-            model_parameters={"temperature": 0.1}
+            model=self.config.model_name, model_parameters={"temperature": 0.1}
         )
         # Build prompt
         prompt = self._build_compliance_prompt(content, product_type)
 
         try:
-
             # WRAP LLM CALL
             async def _call_llm():
                 return await self.client.chat.completions.create(
@@ -286,11 +289,13 @@ class ComplianceCheckerAgent(BaseAgent):
                 usage_details={
                     "prompt_tokens": response.usage.prompt_tokens,
                     "completion_tokens": response.usage.completion_tokens,
-                    "total_tokens": response.usage.total_tokens
+                    "total_tokens": response.usage.total_tokens,
                 }
             )
             # Parse response
-            result = self._parse_compliance_response(response.choices[0].message.content)
+            result = self._parse_compliance_response(
+                response.choices[0].message.content
+            )
 
             return result
         except Exception as e:
@@ -438,17 +443,25 @@ Be thorough and strict - compliance violations can result in significant penalti
 
         # Check content for keywords
         if any(word in content_lower for word in ["invest", "return", "profit"]):
-            disclaimers.append(self.COMPLIANCE_RULES["required_disclaimers"]["investment"])
+            disclaimers.append(
+                self.COMPLIANCE_RULES["required_disclaimers"]["investment"]
+            )
 
         if any(word in content_lower for word in ["loan", "borrow", "mortgage"]):
             disclaimers.append(self.COMPLIANCE_RULES["required_disclaimers"]["loan"])
 
         # [FIX 1a] Make credit keywords stricter to avoid false positives on savings
-        if any(word in content_lower for word in ["credit card", "apr", "credit limit", "overdraft"]):
+        if any(
+            word in content_lower
+            for word in ["credit card", "apr", "credit limit", "overdraft"]
+        ):
             disclaimers.append(self.COMPLIANCE_RULES["required_disclaimers"]["credit"])
 
         # [FIX 1b] Add the specific Savings disclaimer
-        if any(word in content_lower for word in ["savings", "bond", "deposit", "interest rate"]):
+        if any(
+            word in content_lower
+            for word in ["savings", "bond", "deposit", "interest rate"]
+        ):
             disclaimers.append(self.COMPLIANCE_RULES["required_disclaimers"]["savings"])
 
         # Check for sensitive topics

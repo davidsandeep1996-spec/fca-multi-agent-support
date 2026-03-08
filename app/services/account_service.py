@@ -4,6 +4,7 @@ from app.services.base import BaseService
 from app.repositories.account import AccountRepository
 from app.models.account import Account
 
+
 class AccountService(BaseService):
     def __init__(self, db: AsyncSession = None):
         super().__init__(db)

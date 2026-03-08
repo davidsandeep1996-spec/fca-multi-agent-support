@@ -17,10 +17,11 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
     retry_if_exception_type,
-    before_sleep_log
+    before_sleep_log,
 )
 
 from langfuse.langchain import CallbackHandler as LangfuseCallbackHandler
+
 
 # Simple Circuit Breaker
 class SimpleCircuitBreaker:
@@ -89,7 +90,6 @@ class AgentConfig:
         }
 
 
-
 class BaseAgent(ABC):
     """
     Base agent class.
@@ -102,7 +102,7 @@ class BaseAgent(ABC):
         self,
         name: str,
         config: Optional[AgentConfig] = None,
-        services: Optional[Dict[str, Any]] = None
+        services: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize base agent.
@@ -123,7 +123,7 @@ class BaseAgent(ABC):
         #  Use Settings instead of hardcoded 5/60
         self.circuit_breaker = SimpleCircuitBreaker(
             failure_threshold=settings.circuit_breaker_threshold,
-            recovery_timeout=settings.circuit_breaker_recovery_timeout
+            recovery_timeout=settings.circuit_breaker_recovery_timeout,
         )
 
         # Agent metadata
@@ -132,8 +132,6 @@ class BaseAgent(ABC):
 
         # Initialize agent
         self._initialize()
-
-
 
     #  Shared Execute with Retry & Circuit Breaker
     async def execute_with_retry(self, func: Callable, *args, **kwargs):
@@ -153,9 +151,11 @@ class BaseAgent(ABC):
             async for attempt in AsyncRetrying(
                 stop=stop_after_attempt(3),
                 wait=wait_exponential(multiplier=1, min=1, max=10),
-                retry=retry_if_exception_type(Exception), # Retry on any exception (customize as needed)
+                retry=retry_if_exception_type(
+                    Exception
+                ),  # Retry on any exception (customize as needed)
                 before_sleep=before_sleep_log(self.logger, logging.WARNING),
-                reraise=True
+                reraise=True,
             ):
                 with attempt:
                     result = await func(*args, **kwargs)
@@ -254,7 +254,7 @@ class BaseAgent(ABC):
             extra={
                 "agent": self.name,
                 "input_keys": list(input_data.keys()),
-            }
+            },
         )
 
     def log_response(self, response: AgentResponse):
@@ -270,7 +270,7 @@ class BaseAgent(ABC):
                 "agent": self.name,
                 "confidence": response.confidence,
                 "content_length": len(response.content),
-            }
+            },
         )
 
     def create_response(
@@ -315,7 +315,6 @@ class BaseAgent(ABC):
         """String representation."""
         return f"<{self.__class__.__name__}(name='{self.name}')>"
 
-
     def _setup_observability(self):
         """
         Initialize Langfuse callback handler if configured.
@@ -329,12 +328,10 @@ class BaseAgent(ABC):
             return None
 
         try:
-            return LangfuseCallbackHandler(
-            )
+            return LangfuseCallbackHandler()
         except Exception as e:
             self.logger.error(f"Failed to initialize Langfuse: {e}")
             return None
-
 
     #  Helper to get callbacks for LLM calls
     def get_llm_callbacks(self) -> List[Any]:

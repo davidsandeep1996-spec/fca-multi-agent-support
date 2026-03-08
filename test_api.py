@@ -5,14 +5,15 @@ Message Router API Test
 from fastapi.testclient import TestClient
 from app.main import app  # Assuming FastAPI app in app/main.py
 
+
 def test_message_api():
     """Test message API endpoints."""
 
     client = TestClient(app)
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("MESSAGE ROUTER API TEST")
-    print("="*60)
+    print("=" * 60)
 
     # Test health check
     print("\n1️⃣ Health Check")
@@ -28,7 +29,7 @@ def test_message_api():
             "message": "What's my account balance?",
             "customer_id": 101,
             "conversation_id": 1,
-        }
+        },
     )
     print(f"Status: {response.status_code}")
     result = response.json()
@@ -54,6 +55,7 @@ def test_message_api():
         print(f"Total Conversations: {stats['total_conversations']}")
         print(f"Total Messages: {stats['total_messages']}")
         print(f"Escalations: {stats['escalated_conversations']}")
+
 
 if __name__ == "__main__":
     test_message_api()

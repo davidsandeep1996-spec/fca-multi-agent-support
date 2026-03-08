@@ -103,7 +103,7 @@ class Customer(BaseModel):
 
     hashed_password = Column(
         String(255),
-        nullable=True, # Nullable for legacy/migrated users initially
+        nullable=True,  # Nullable for legacy/migrated users initially
         comment="Bcrypt hashed password",
     )
 
@@ -183,7 +183,9 @@ class Customer(BaseModel):
 
     def __repr__(self) -> str:
         """String representation of customer."""
-        return f"<Customer(id={self.id}, name='{self.full_name}', email='{self.email}')>"
+        return (
+            f"<Customer(id={self.id}, name='{self.full_name}', email='{self.email}')>"
+        )
 
     def to_dict(self, include_conversations: bool = False) -> dict:
         """
@@ -214,8 +216,7 @@ class Customer(BaseModel):
 
         if include_conversations:
             data["conversations"] = [
-                conv.to_dict(include_messages=False)
-                for conv in self.conversations
+                conv.to_dict(include_messages=False) for conv in self.conversations
             ]
             data["conversation_count"] = self.conversation_count
 

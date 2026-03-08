@@ -10,7 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.base import BaseService
 from app.repositories.conversation import ConversationRepository
 from app.repositories.customer import CustomerRepository
-from app.models.conversation import Conversation, ConversationStatus, ConversationChannel
+from app.models.conversation import (
+    Conversation,
+    ConversationStatus,
+    ConversationChannel,
+)
 
 
 class ConversationService(BaseService):
@@ -23,7 +27,7 @@ class ConversationService(BaseService):
     def __init__(self, db: AsyncSession = None):
         """Initialize conversation service."""
         super().__init__(db)
-# 👇 THIS WAS LIKELY MISSING OR BROKEN 👇
+        # 👇 THIS WAS LIKELY MISSING OR BROKEN 👇
         if self.db:
             self.repo = ConversationRepository(self.db)
             self.customer_repo = CustomerRepository(self.db)
@@ -42,7 +46,7 @@ class ConversationService(BaseService):
         self,
         customer_id: int,
         title: str,
-        channel: ConversationChannel = ConversationChannel.WEB
+        channel: ConversationChannel = ConversationChannel.WEB,
     ) -> Conversation:
         """
         Start new conversation.
@@ -90,10 +94,7 @@ class ConversationService(BaseService):
         return await self.repo.get_by_id(conversation_id)
 
     async def get_customer_conversations(
-        self,
-        customer_id: int,
-        page: int = 1,
-        page_size: int = 100
+        self, customer_id: int, page: int = 1, page_size: int = 100
     ) -> List[Conversation]:
         """
         Get conversations for customer.
@@ -107,16 +108,10 @@ class ConversationService(BaseService):
             List[Conversation]: Customer conversations
         """
         skip = (page - 1) * page_size
-        return await self.repo.get_by_customer(
-            customer_id,
-            skip=skip,
-            limit=page_size
-        )
+        return await self.repo.get_by_customer(customer_id, skip=skip, limit=page_size)
 
     async def resolve_conversation(
-        self,
-        conversation_id: int,
-        summary: str = None
+        self, conversation_id: int, summary: str = None
     ) -> Optional[Conversation]:
         """
         Mark conversation as resolved.
@@ -143,7 +138,7 @@ class ConversationService(BaseService):
         reason: str,
         priority: str,
         assigned_group: str = None,  # [FIX] New Arg
-        ticket_id: str = None        # [FIX] New Arg
+        ticket_id: str = None,  # [FIX] New Arg
     ) -> Optional[Conversation]:
         """Escalate with full tracking details."""
 
@@ -155,7 +150,7 @@ class ConversationService(BaseService):
                 reason=reason,
                 priority=priority,
                 assigned_group=assigned_group,
-                ticket_id=ticket_id
+                ticket_id=ticket_id,
             )
 
             await self.repo.session.commit()

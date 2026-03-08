@@ -24,7 +24,6 @@ class CustomerRepository(BaseRepository[Customer]):
         """Initialize customer repository."""
         super().__init__(Customer, db)
 
-
     async def get_by_email(self, email: str) -> Optional[Customer]:
         """
         Get customer by email.
@@ -35,9 +34,7 @@ class CustomerRepository(BaseRepository[Customer]):
         Returns:
             Customer or None: Customer if found
         """
-        result = await self.db.execute(
-            select(Customer).where(Customer.email == email)
-        )
+        result = await self.db.execute(select(Customer).where(Customer.email == email))
         return result.scalar_one_or_none()
 
     async def get_by_customer_id(self, customer_id: str) -> Optional[Customer]:
@@ -56,9 +53,7 @@ class CustomerRepository(BaseRepository[Customer]):
         return result.scalar_one_or_none()
 
     async def get_active_customers(
-        self,
-        skip: int = 0,
-        limit: int = 100
+        self, skip: int = 0, limit: int = 100
     ) -> List[Customer]:
         """
         Get active customers.
@@ -80,9 +75,7 @@ class CustomerRepository(BaseRepository[Customer]):
         return result.scalars().all()
 
     async def get_vip_customers(
-        self,
-        skip: int = 0,
-        limit: int = 100
+        self, skip: int = 0, limit: int = 100
     ) -> List[Customer]:
         """
         Get VIP customers.
@@ -105,10 +98,7 @@ class CustomerRepository(BaseRepository[Customer]):
         return result.scalars().all()
 
     async def search_by_name(
-        self,
-        name: str,
-        skip: int = 0,
-        limit: int = 100
+        self, name: str, skip: int = 0, limit: int = 100
     ) -> List[Customer]:
         """
         Search customers by name (first or last).
@@ -126,8 +116,8 @@ class CustomerRepository(BaseRepository[Customer]):
         result = await self.db.execute(
             select(Customer)
             .where(
-                (Customer.first_name.ilike(search_term)) |
-                (Customer.last_name.ilike(search_term))
+                (Customer.first_name.ilike(search_term))
+                | (Customer.last_name.ilike(search_term))
             )
             .offset(skip)
             .limit(limit)

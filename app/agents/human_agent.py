@@ -13,12 +13,15 @@ from app.agents.base import BaseAgent, AgentConfig, AgentResponse
 from app.services import ConversationService
 from langfuse import observe
 
+
 class EscalationPriority(str, Enum):
     """Escalation priority levels."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     URGENT = "urgent"
+
 
 class EscalationTicket(BaseModel):
     id: str
@@ -33,9 +36,6 @@ class EscalationTicket(BaseModel):
     created_at: str
 
 
-
-
-
 class HumanAgent(BaseAgent):
     """
     Human agent for escalations.
@@ -47,8 +47,12 @@ class HumanAgent(BaseAgent):
     - Escalation tracking
     """
 
-    def __init__(self, config: Optional[AgentConfig] = None, conversation_service: ConversationService = None,
-    **kwargs):
+    def __init__(
+        self,
+        config: Optional[AgentConfig] = None,
+        conversation_service: ConversationService = None,
+        **kwargs,
+    ):
         """Initialize human agent."""
         super().__init__(name="human_agent", config=config)
         self.conversation_service = conversation_service or ConversationService()
@@ -121,9 +125,7 @@ class HumanAgent(BaseAgent):
             )
 
             # Generate response
-            response_content = self._generate_escalation_response(
-                escalation, priority
-            )
+            response_content = self._generate_escalation_response(escalation, priority)
 
             response = self.create_response(
                 content=response_content,
@@ -170,22 +172,45 @@ class HumanAgent(BaseAgent):
 
         # Urgent keywords
         urgent_keywords = [
-            "urgent", "emergency", "critical", "immediate",
-            "lost", "stolen", "fraud", "unauthorized",
-            "cannot access", "locked out", "security breach"
+            "urgent",
+            "emergency",
+            "critical",
+            "immediate",
+            "lost",
+            "stolen",
+            "fraud",
+            "unauthorized",
+            "cannot access",
+            "locked out",
+            "security breach",
         ]
 
         # High priority keywords
         high_keywords = [
-            "complaint", "disappointed", "unhappy", "unacceptable",
-            "refused", "denied", "failed", "issue", "problem",
-            "wrong", "error", "mistake"
+            "complaint",
+            "disappointed",
+            "unhappy",
+            "unacceptable",
+            "refused",
+            "denied",
+            "failed",
+            "issue",
+            "problem",
+            "wrong",
+            "error",
+            "mistake",
         ]
 
         # Medium priority keywords
         medium_keywords = [
-            "help", "question", "need", "want", "prefer",
-            "change", "update", "modify"
+            "help",
+            "question",
+            "need",
+            "want",
+            "prefer",
+            "change",
+            "update",
+            "modify",
         ]
 
         # Check priority levels
@@ -226,22 +251,31 @@ class HumanAgent(BaseAgent):
         if conversation_service:
             try:
                 # [CRITICAL CHECK] Ensure service has a DB session
-                if hasattr(conversation_service, 'db') and conversation_service.db is not None:
+                if (
+                    hasattr(conversation_service, "db")
+                    and conversation_service.db is not None
+                ):
                     await conversation_service.escalate_conversation(
                         conversation_id,
                         reason=issue,
                         priority=priority.value,
                         assigned_group=assigned_group,
-                        ticket_id=ticket_id
+                        ticket_id=ticket_id,
                     )
                     saved_status = True
-                    self.logger.info(f"Escalation saved to DB for conversation {conversation_id}")
+                    self.logger.info(
+                        f"Escalation saved to DB for conversation {conversation_id}"
+                    )
                 else:
-                    self.logger.warning("ConversationService has no DB session. Cannot save escalation.")
+                    self.logger.warning(
+                        "ConversationService has no DB session. Cannot save escalation."
+                    )
             except Exception as e:
                 self.logger.warning(f"Could not save escalation: {e}")
         else:
-            self.logger.warning("No ConversationService available. Escalation is in-memory only.")
+            self.logger.warning(
+                "No ConversationService available. Escalation is in-memory only."
+            )
 
         # 3. RETURN PYDANTIC MODEL (Not a dict)
         return EscalationTicket(
@@ -254,8 +288,9 @@ class HumanAgent(BaseAgent):
             created_at=datetime.utcnow().isoformat(),
             assigned_to=assigned_group,
             estimated_response=self._estimate_response_time(priority),
-            saved=saved_status
+            saved=saved_status,
         )
+
     def _estimate_response_time(self, priority: EscalationPriority) -> str:
         """
         Estimate response time based on priority.
@@ -319,9 +354,7 @@ class HumanAgent(BaseAgent):
                 "immediately via your preferred contact method.\n"
             )
         else:
-            response += (
-                "A specialist will review your case and contact you shortly.\n"
-            )
+            response += "A specialist will review your case and contact you shortly.\n"
 
         response += (
             "\nYou'll receive:\n"

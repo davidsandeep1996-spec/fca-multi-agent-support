@@ -4,6 +4,7 @@ import json
 import uuid
 import os
 
+
 # [CHANGE 1a] Move this to the TOP of the file (after imports/config)
 def fetch_current_user():
     """Updates session state with the logged-in user's real ID."""
@@ -12,11 +13,12 @@ def fetch_current_user():
             return
 
         # Decode JWT (Middle part)
-        token_parts = st.session_state.token.split('.')
+        token_parts = st.session_state.token.split(".")
         if len(token_parts) > 1:
-            payload_part = token_parts[1] + '=' * (-len(token_parts[1]) % 4)
+            payload_part = token_parts[1] + "=" * (-len(token_parts[1]) % 4)
             import base64
-            payload = json.loads(base64.b64decode(payload_part).decode('utf-8'))
+
+            payload = json.loads(base64.b64decode(payload_part).decode("utf-8"))
 
             # Get ID (Standard JWT claims usually have 'sub' or 'id')
             real_id = payload.get("id") or payload.get("sub")
@@ -24,12 +26,13 @@ def fetch_current_user():
             if real_id:
                 # Handle "CUST-001" vs 121 format
                 if str(real_id).isdigit():
-                     st.session_state.customer_id = int(real_id)
+                    st.session_state.customer_id = int(real_id)
                 st.toast(f"✅ Verified Identity: {real_id}")
 
     except Exception as e:
         # Don't break the app, just log
         print(f"User ID Error: {e}")
+
 
 # [CHANGE] Update this function to RETURN the list instead of setting state directly
 def fetch_user_conversations():
@@ -42,7 +45,7 @@ def fetch_user_conversations():
         response = requests.get(
             f"{API_BASE_URL}/customers/{st.session_state.customer_id}/conversations",
             headers=headers,
-            timeout=5
+            timeout=5,
         )
 
         if response.status_code == 200:
@@ -57,6 +60,7 @@ def fetch_user_conversations():
         st.error(f"Failed to fetch chats: {e}")
         return []
 
+
 # [CHANGE 1b] Add this function to find the REAL conversation
 def restore_latest_conversation():
     """Finds the user's most recent conversation and restores it."""
@@ -70,7 +74,7 @@ def restore_latest_conversation():
         response = requests.get(
             f"{API_BASE_URL}/customers/{st.session_state.customer_id}/conversations",
             headers=headers,
-            timeout=5
+            timeout=5,
         )
 
         if response.status_code == 200:
@@ -80,7 +84,9 @@ def restore_latest_conversation():
             if conversations:
                 # 2. Pick the most recent one (Sort by last_updated)
                 # Assuming backend sends ISO format dates, string sort works for ISO
-                conversations.sort(key=lambda x: x.get("last_updated", ""), reverse=True)
+                conversations.sort(
+                    key=lambda x: x.get("last_updated", ""), reverse=True
+                )
 
                 last_conv = conversations[0]
                 st.session_state.conversation_id = last_conv["conversation_id"]
@@ -94,7 +100,6 @@ def restore_latest_conversation():
         st.error(f"Failed to restore session: {e}")
 
 
-
 def load_chat_history():
     """Fetches chat history from the backend and populates session state."""
     try:
@@ -106,7 +111,7 @@ def load_chat_history():
         response = requests.get(
             f"{API_BASE_URL}/conversations/{st.session_state.conversation_id}/history",
             headers=headers,
-            timeout=5
+            timeout=5,
         )
 
         if response.status_code == 200:
@@ -118,13 +123,13 @@ def load_chat_history():
             for msg in history:
                 # Map backend roles to streamlit roles
                 role = "user" if msg["role"] == "user" else "assistant"
-                st.session_state.messages.append({
-                    "role": role,
-                    "content": msg["content"]
-                })
+                st.session_state.messages.append(
+                    {"role": role, "content": msg["content"]}
+                )
 
     except Exception as e:
         st.error(f"Failed to load history: {e}")
+
 
 # ============================================================
 # CONFIGURATION
@@ -152,7 +157,6 @@ if "debug_info" not in st.session_state:
     st.session_state.debug_info = {}
 
 
-
 # Add this function BEFORE login()
 def fetch_active_conversation():
     """
@@ -168,7 +172,7 @@ def fetch_active_conversation():
         response = requests.get(
             f"{API_BASE_URL}/customers/{st.session_state.customer_id}/conversations",
             headers=headers,
-            timeout=5
+            timeout=5,
         )
 
         if response.status_code == 200:
@@ -177,7 +181,9 @@ def fetch_active_conversation():
 
             if conversations:
                 # Sort by last_updated (Newest first) to stick to the active thread
-                conversations.sort(key=lambda x: x.get("last_updated", ""), reverse=True)
+                conversations.sort(
+                    key=lambda x: x.get("last_updated", ""), reverse=True
+                )
                 active_id = conversations[0]["conversation_id"]
                 st.session_state.conversation_id = active_id
                 st.toast(f"📂 Resumed Conversation #{active_id}")
@@ -189,6 +195,7 @@ def fetch_active_conversation():
 
     except Exception as e:
         st.error(f"Failed to sync conversation: {e}")
+
 
 # ============================================================
 # AUTHENTICATION FUNCTIONS
@@ -204,7 +211,7 @@ def login(username, password):
         response = requests.post(
             f"{root_url}/auth/login",  # <--- Use root_url, NOT API_BASE_URL
             data={"username": username, "password": password},
-            timeout=5
+            timeout=5,
         )
 
         # 3. Handle Success
@@ -214,11 +221,8 @@ def login(username, password):
             # [FIX] Update Customer ID from Token immediately
             fetch_current_user()
 
-
-
             # [CHANGE] Auto-select the newest chat
             fetch_active_conversation()
-
 
             #  Load history immediately after login
             load_chat_history()
@@ -230,13 +234,15 @@ def login(username, password):
     except Exception as e:
         st.error(f"Connection Error: {e}")
 
+
 def logout():
     """Clear session state."""
     st.session_state.token = None
     st.session_state.messages = []
-    st.session_state.customer_id = None # [FIX] Clear the ID
-    st.session_state.conversation_id = None # [FIX] Clear the Chat ID
+    st.session_state.customer_id = None  # [FIX] Clear the ID
+    st.session_state.conversation_id = None  # [FIX] Clear the Chat ID
     st.rerun()
+
 
 # ============================================================
 # VIEW 1: LOGIN SCREEN
@@ -302,7 +308,9 @@ with st.sidebar:
 
 # --- CHAT INTERFACE ---
 st.title(f"{PAGE_ICON} AI Support Agent")
-st.caption(f"Logged in as: **{st.session_state.customer_id}** | Protected by Lakera & Presidio")
+st.caption(
+    f"Logged in as: **{st.session_state.customer_id}** | Protected by Lakera & Presidio"
+)
 
 # Display History
 for message in st.session_state.messages:
@@ -324,20 +332,19 @@ if prompt := st.chat_input("How can I help you today?"):
         try:
             headers = {
                 "Authorization": f"Bearer {st.session_state.token}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
             }
             payload = {
                 "message": prompt,
                 "customer_id": st.session_state.customer_id,
-                "conversation_id": st.session_state.conversation_id
+                "conversation_id": st.session_state.conversation_id,
             }
-
 
             response = requests.post(
                 f"{API_BASE_URL}/messages/process",
                 headers=headers,
                 json=payload,
-                timeout=120
+                timeout=120,
             )
 
             if response.status_code == 200:
@@ -346,12 +353,14 @@ if prompt := st.chat_input("How can I help you today?"):
 
                 new_id = data.get("conversation_id")
                 if new_id and new_id != st.session_state.conversation_id:
-                     st.session_state.conversation_id = new_id
+                    st.session_state.conversation_id = new_id
                 message_placeholder.markdown(bot_reply)
-                st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": bot_reply}
+                )
 
                 st.session_state.debug_info = data
-                st.rerun() # Update sidebar
+                st.rerun()  # Update sidebar
             elif response.status_code == 401:
                 st.error("Session Expired. Please logout and login again.")
             else:

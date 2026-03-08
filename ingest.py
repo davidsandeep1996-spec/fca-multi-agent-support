@@ -7,6 +7,7 @@ sys.path.append(os.getcwd())
 
 from app.services.rag_service import RAGService
 
+
 async def run_ingestion():
     print("🚀 Starting RAG Ingestion...")
     rag = RAGService()
@@ -16,7 +17,9 @@ async def run_ingestion():
 
     if not os.path.exists(pdf_path):
         print(f"❌ Error: File not found at {pdf_path}")
-        print("   Make sure you saved the PDF inside a 'data' folder in your project root.")
+        print(
+            "   Make sure you saved the PDF inside a 'data' folder in your project root."
+        )
         return
 
     try:
@@ -24,6 +27,7 @@ async def run_ingestion():
         print(f"✅ SUCCESS! Ingested {chunks} document chunks into pgvector.")
     except Exception as e:
         print(f"❌ Failed: {e}")
+
 
 if __name__ == "__main__":
     asyncio.run(run_ingestion())

@@ -70,7 +70,6 @@ def generate_customers(count: int = 100, default_pwd_hash: str = None) -> list[d
                 "email": fake.unique.email(),
                 "phone": fake.phone_number(),
                 "is_vip": fake.random_element([True, False, False, False]),  # ~25% VIP
-
                 "hashed_password": default_pwd_hash,
                 "role": "user",
                 "scopes": "read:accounts",
@@ -89,7 +88,11 @@ SAMPLE_PRODUCTS = [
         "type": "loan",  # DB uses generic 'loan' type or you can add 'mortgage' to Enum
         "description": "Interest rate stays the same for agreed period",
         "interest_rate": Decimal("3.99"),
-        "features": ["2, 3, 5, or 10 year fixed terms", "Suitable for first time buyers", "Stability"],
+        "features": [
+            "2, 3, 5, or 10 year fixed terms",
+            "Suitable for first time buyers",
+            "Stability",
+        ],
         "requirements": {"min_deposit": 0.05, "min_income": 25000},
         "is_active": True,
     },
@@ -98,11 +101,14 @@ SAMPLE_PRODUCTS = [
         "type": "loan",
         "description": "Interest rate tracks Bank of England base rate (Base + 1.5%)",
         "interest_rate": Decimal("5.50"),  # Approx 4.0 base + 1.5
-        "features": ["Flexible terms", "Tracks base rate", "Lower early repayment charges"],
+        "features": [
+            "Flexible terms",
+            "Tracks base rate",
+            "Lower early repayment charges",
+        ],
         "requirements": {"min_deposit": 0.10},
         "is_active": True,
     },
-
     # --- SAVINGS ---
     {
         "name": "Instant Access Savings",
@@ -118,11 +124,14 @@ SAMPLE_PRODUCTS = [
         "type": "savings",
         "description": "Fixed interest rate for set period (1-5 years)",
         "interest_rate": Decimal("5.10"),
-        "features": ["Guaranteed return", "Higher interest rate", "Funds locked for term"],
+        "features": [
+            "Guaranteed return",
+            "Higher interest rate",
+            "Funds locked for term",
+        ],
         "requirements": {"min_balance": 1000},
         "is_active": True,
     },
-
     # --- CREDIT CARDS ---
     {
         "name": "Cashback Credit Card",
@@ -142,7 +151,6 @@ SAMPLE_PRODUCTS = [
         "requirements": {"credit_score": 700},
         "is_active": True,
     },
-
     # --- LOANS ---
     {
         "name": "Personal Loan",
@@ -153,7 +161,6 @@ SAMPLE_PRODUCTS = [
         "requirements": {"min_income": 20000},
         "is_active": True,
     },
-
     # --- CURRENT ACCOUNTS (Keep this from original seed) ---
     {
         "name": "Current Account",
@@ -179,7 +186,7 @@ SAMPLE_FAQS = [
             "The process takes about 10 minutes."
         ),
         "category": "account",
-        "keywords": "open, join, register, new account"
+        "keywords": "open, join, register, new account",
     },
     {
         "question": "How do I contact support?",
@@ -192,7 +199,7 @@ SAMPLE_FAQS = [
             "Our team typically responds within 24 hours."
         ),
         "category": "support",
-        "keywords": "phone, email, chat, help, contact"
+        "keywords": "phone, email, chat, help, contact",
     },
     {
         "question": "What are your account fees?",
@@ -206,7 +213,7 @@ SAMPLE_FAQS = [
             "See our full fee schedule at bank.com/fees"
         ),
         "category": "fees",
-        "keywords": "cost, charge, free, overdraft, transfer fee"
+        "keywords": "cost, charge, free, overdraft, transfer fee",
     },
     {
         "question": "What interest rates do you offer?",
@@ -220,7 +227,7 @@ SAMPLE_FAQS = [
             "Rates subject to change. See full rates at bank.com/rates"
         ),
         "category": "products",
-        "keywords": "rate, interest, apr, aer, mortgage rate"
+        "keywords": "rate, interest, apr, aer, mortgage rate",
     },
     {
         "question": "Is my money safe with you?",
@@ -234,7 +241,7 @@ SAMPLE_FAQS = [
             "We take security seriously."
         ),
         "category": "security",
-        "keywords": "safe, secure, fraud, protection, fscs"
+        "keywords": "safe, secure, fraud, protection, fscs",
     },
     {
         "question": "What can I do in the mobile app?",
@@ -250,28 +257,76 @@ SAMPLE_FAQS = [
             "Download from App Store or Google Play"
         ),
         "category": "digital",
-        "keywords": "app, mobile, features, download, phone"
+        "keywords": "app, mobile, features, download, phone",
     },
 ]
 
 REALISTIC_MERCHANTS = [
-    "Tesco", "Sainsbury's", "Asda", "Morrisons", "Waitrose", "Co-op",
-    "Lidl", "Aldi", "Iceland", "Marks & Spencer", "Starbucks", "Costa Coffee",
-    "Pret A Manger", "Greggs", "McDonald's", "Subway", "Pizza Hut", "KFC",
-    "Nando's", "Wagamama", "Netflix", "Spotify", "Amazon", "eBay",
-    "Argos", "John Lewis", "Boots", "Uber",
+    "Tesco",
+    "Sainsbury's",
+    "Asda",
+    "Morrisons",
+    "Waitrose",
+    "Co-op",
+    "Lidl",
+    "Aldi",
+    "Iceland",
+    "Marks & Spencer",
+    "Starbucks",
+    "Costa Coffee",
+    "Pret A Manger",
+    "Greggs",
+    "McDonald's",
+    "Subway",
+    "Pizza Hut",
+    "KFC",
+    "Nando's",
+    "Wagamama",
+    "Netflix",
+    "Spotify",
+    "Amazon",
+    "eBay",
+    "Argos",
+    "John Lewis",
+    "Boots",
+    "Uber",
 ]
 
 TRANSACTION_CATEGORIES = [
-    "groceries", "dining", "entertainment", "transport", "utilities", "shopping",
-    "subscriptions", "travel", "health", "fitness", "education", "bills",
-    "insurance", "fuel", "phone", "internet",
+    "groceries",
+    "dining",
+    "entertainment",
+    "transport",
+    "utilities",
+    "shopping",
+    "subscriptions",
+    "travel",
+    "health",
+    "fitness",
+    "education",
+    "bills",
+    "insurance",
+    "fuel",
+    "phone",
+    "internet",
 ]
 
 SAMPLE_CONVERSATIONS = [
-    {"title": "Mortgage Application Inquiry", "channel": ConversationChannel.WEB, "intent": "loan_inquiry"},
-    {"title": "Account Balance Question", "channel": ConversationChannel.MOBILE, "intent": "account_balance"},
-    {"title": "Credit Card Application", "channel": ConversationChannel.WEB, "intent": "credit_card"},
+    {
+        "title": "Mortgage Application Inquiry",
+        "channel": ConversationChannel.WEB,
+        "intent": "loan_inquiry",
+    },
+    {
+        "title": "Account Balance Question",
+        "channel": ConversationChannel.MOBILE,
+        "intent": "account_balance",
+    },
+    {
+        "title": "Credit Card Application",
+        "channel": ConversationChannel.WEB,
+        "intent": "credit_card",
+    },
 ]
 
 
@@ -285,9 +340,8 @@ async def seed_customers(count: int = 100) -> list[int]:
     security = SecurityService()
     default_hash = security.get_password_hash("password123")
 
-
     customer_ids: list[int] = []
-    customers_data = generate_customers(count, default_pwd_hash=default_hash )
+    customers_data = generate_customers(count, default_pwd_hash=default_hash)
     customers_failed = 0
 
     async with CustomerService() as service:
@@ -304,8 +358,11 @@ async def seed_customers(count: int = 100) -> list[int]:
 
         await service.commit()
 
-    logger.info(f"📊 Seeded {len(customer_ids)}/{count} customers ({customers_failed} failed)\n")
+    logger.info(
+        f"📊 Seeded {len(customer_ids)}/{count} customers ({customers_failed} failed)\n"
+    )
     return customer_ids
+
 
 async def seed_faqs(session: AsyncSession):
     """Seed FAQ data."""
@@ -333,7 +390,9 @@ async def seed_products() -> list[int]:
                 product = await service.repo.create(data)
                 await service.commit()  # Commit EACH product individually
                 product_ids.append(product.id)
-                logger.info(f"✅ Created product: {product.name} ({product.type}) id={product.id}")
+                logger.info(
+                    f"✅ Created product: {product.name} ({product.type}) id={product.id}"
+                )
             except Exception as e:
                 products_failed += 1
                 try:
@@ -342,7 +401,9 @@ async def seed_products() -> list[int]:
                     pass
                 logger.warning(f"⚠️  Skipped product {data.get('name')}: {str(e)[:200]}")
 
-    logger.info(f"🔐 {len(product_ids)}/{len(SAMPLE_PRODUCTS)} Products COMMITTED - safe for FK references ({products_failed} failed)\n")
+    logger.info(
+        f"🔐 {len(product_ids)}/{len(SAMPLE_PRODUCTS)} Products COMMITTED - safe for FK references ({products_failed} failed)\n"
+    )
     return product_ids
 
 
@@ -365,7 +426,9 @@ async def seed_accounts(customer_ids: list[int], product_ids: list[int]) -> list
                     from app.models.customer import Customer
 
                     customer = await session.get(Customer, customer_id)
-                    ext_customer_id = customer.customer_id if customer else f"CUST-{idx+1:06d}"
+                    ext_customer_id = (
+                        customer.customer_id if customer else f"CUST-{idx + 1:06d}"
+                    )
 
                 num_accounts = 2 + (idx % 2)  # 2 or 3 accounts
                 for j in range(num_accounts):
@@ -381,14 +444,18 @@ async def seed_accounts(customer_ids: list[int], product_ids: list[int]) -> list
                             "status": AccountStatus.ACTIVE,
                             "currency": "GBP",
                             "balance": Decimal(str(fake.random_int(1000, 500000))),
-                            "available_balance": Decimal(str(fake.random_int(500, 500000))),
+                            "available_balance": Decimal(
+                                str(fake.random_int(500, 500000))
+                            ),
                         }
 
                         account = await service.repo.create(account_data)
                         account_ids.append(account.id)
                     except Exception as e:
                         accounts_failed += 1
-                        logger.debug(f"⚠️  Skipped account {ext_customer_id}:{j}: {str(e)[:200]}")
+                        logger.debug(
+                            f"⚠️  Skipped account {ext_customer_id}:{j}: {str(e)[:200]}"
+                        )
                         continue
 
                 await service.commit()
@@ -402,7 +469,9 @@ async def seed_accounts(customer_ids: list[int], product_ids: list[int]) -> list
                 continue
 
             if (idx + 1) % 20 == 0:
-                logger.info(f"  ✅ Created {len(account_ids)} accounts for {idx + 1}/{len(customer_ids)} customers ({accounts_failed} failed)")
+                logger.info(
+                    f"  ✅ Created {len(account_ids)} accounts for {idx + 1}/{len(customer_ids)} customers ({accounts_failed} failed)"
+                )
 
     logger.info(f"📊 Seeded {len(account_ids)} accounts ({accounts_failed} failed)\n")
     return account_ids
@@ -425,7 +494,9 @@ async def seed_transactions(account_ids: list[int]) -> int:
                 try:
                     days_ago = fake.random_int(1, 90)
                     # FIXED: Use naive UTC datetime instead of deprecated utcnow()
-                    trans_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days_ago)
+                    trans_date = datetime.now(timezone.utc).replace(
+                        tzinfo=None
+                    ) - timedelta(days=days_ago)
 
                     transaction_data = {
                         "account_id": account_id,
@@ -462,16 +533,22 @@ async def seed_transactions(account_ids: list[int]) -> int:
             try:
                 await service.commit()
             except Exception as e:
-                logger.warning(f"❌ Account {account_id} commit failed: {type(e).__name__}: {str(e)}")
+                logger.warning(
+                    f"❌ Account {account_id} commit failed: {type(e).__name__}: {str(e)}"
+                )
                 try:
                     await service.rollback()
                 except Exception:
                     pass
 
             if acc_idx % 50 == 0:
-                logger.info(f"  ✅ Created {transaction_count:,} transactions for {acc_idx}/{len(account_ids)} accounts ({transactions_failed} failed)")
+                logger.info(
+                    f"  ✅ Created {transaction_count:,} transactions for {acc_idx}/{len(account_ids)} accounts ({transactions_failed} failed)"
+                )
 
-    logger.info(f"📊 Seeded {transaction_count:,} transactions ({transactions_failed} failed)\n")
+    logger.info(
+        f"📊 Seeded {transaction_count:,} transactions ({transactions_failed} failed)\n"
+    )
     return transaction_count
 
 
@@ -498,7 +575,9 @@ async def seed_conversations(customer_ids: list[int]) -> list[int]:
 
         await service.commit()
 
-    logger.info(f"📊 Seeded {len(conversation_ids)}/{len(SAMPLE_CONVERSATIONS)} conversations ({conversations_failed} failed)\n")
+    logger.info(
+        f"📊 Seeded {len(conversation_ids)}/{len(SAMPLE_CONVERSATIONS)} conversations ({conversations_failed} failed)\n"
+    )
     return conversation_ids
 
 
@@ -535,7 +614,9 @@ async def seed_messages(conversation_ids: list[int]) -> int:
         for i, conversation_id in enumerate(conversation_ids):
             for msg_data in sample_messages[i : i + 2]:
                 try:
-                    await service.add_message(conversation_id=conversation_id, **msg_data)
+                    await service.add_message(
+                        conversation_id=conversation_id, **msg_data
+                    )
                     message_count += 1
                 except Exception as e:
                     messages_failed += 1
@@ -611,7 +692,9 @@ async def seed_all(clear_first: bool = False, customer_count: int = 100) -> None
 
         expected_customers = customer_count
         expected_accounts = int(len(customer_ids) * expected_accounts_per_customer)
-        expected_transactions = int(expected_accounts * expected_transactions_per_account)
+        expected_transactions = int(
+            expected_accounts * expected_transactions_per_account
+        )
         expected_messages = expected_conversations * expected_messages_per_conversation
         expected_total = (
             expected_customers
@@ -638,27 +721,47 @@ async def seed_all(clear_first: bool = False, customer_count: int = 100) -> None
         )
 
         variance = actual_total - expected_total
-        variance_percent = (variance / expected_total * 100) if expected_total > 0 else 0
-        success_rate = (actual_total / expected_total * 100) if expected_total > 0 else 0
+        variance_percent = (
+            (variance / expected_total * 100) if expected_total > 0 else 0
+        )
+        success_rate = (
+            (actual_total / expected_total * 100) if expected_total > 0 else 0
+        )
 
         logger.info("\n📊 DETAILED SEEDING REPORT\n")
         logger.info("=" * 75)
         logger.info(f"{'ENTITY':<20} {'EXPECTED':>18} {'ACTUAL':>18} {'VARIANCE':>15}")
         logger.info("=" * 75)
-        logger.info(f"{'Customers':<20} {expected_customers:>18,} {actual_customers:>18,} {actual_customers - expected_customers:>+14,}")
-        logger.info(f"{'Products':<20} {expected_products:>18,} {actual_products:>18,} {actual_products - expected_products:>+14,}")
-        logger.info(f"{'Accounts':<20} {expected_accounts:>18,} {actual_accounts:>18,} {actual_accounts - expected_accounts:>+14,}")
-        logger.info(f"{'Transactions':<20} {expected_transactions:>18,} {actual_transactions:>18,} {actual_transactions - expected_transactions:>+14,}")
-        logger.info(f"{'Conversations':<20} {expected_conversations:>18,} {actual_conversations:>18,} {actual_conversations - expected_conversations:>+14,}")
-        logger.info(f"{'Messages':<20} {expected_messages:>18,} {actual_messages:>18,} {actual_messages - expected_messages:>+14,}")
+        logger.info(
+            f"{'Customers':<20} {expected_customers:>18,} {actual_customers:>18,} {actual_customers - expected_customers:>+14,}"
+        )
+        logger.info(
+            f"{'Products':<20} {expected_products:>18,} {actual_products:>18,} {actual_products - expected_products:>+14,}"
+        )
+        logger.info(
+            f"{'Accounts':<20} {expected_accounts:>18,} {actual_accounts:>18,} {actual_accounts - expected_accounts:>+14,}"
+        )
+        logger.info(
+            f"{'Transactions':<20} {expected_transactions:>18,} {actual_transactions:>18,} {actual_transactions - expected_transactions:>+14,}"
+        )
+        logger.info(
+            f"{'Conversations':<20} {expected_conversations:>18,} {actual_conversations:>18,} {actual_conversations - expected_conversations:>+14,}"
+        )
+        logger.info(
+            f"{'Messages':<20} {expected_messages:>18,} {actual_messages:>18,} {actual_messages - expected_messages:>+14,}"
+        )
         logger.info("-" * 75)
-        logger.info(f"{'TOTAL RECORDS':<20} {expected_total:>18,} {actual_total:>18,} {variance:>+14,}")
+        logger.info(
+            f"{'TOTAL RECORDS':<20} {expected_total:>18,} {actual_total:>18,} {variance:>+14,}"
+        )
         logger.info("=" * 75)
 
         logger.info("\n📈 PERFORMANCE METRICS:")
         logger.info(f"  • Total Expected:     {expected_total:>10,} records")
         logger.info(f"  • Total Actual:       {actual_total:>10,} records")
-        logger.info(f"  • Variance:           {variance:>+10,} records ({variance_percent:>+.2f}%)")
+        logger.info(
+            f"  • Variance:           {variance:>+10,} records ({variance_percent:>+.2f}%)"
+        )
         logger.info(f"  • Success Rate:       {success_rate:>10.2f}%")
 
         logger.info("\n" + "=" * 75)
@@ -670,16 +773,22 @@ async def seed_all(clear_first: bool = False, customer_count: int = 100) -> None
             logger.info(f"     Variance within acceptable range: {variance:+,} records")
         elif -50 < variance < -5:
             logger.info("  ⚠️  WARNING - Minor record creation failures detected")
-            logger.info(f"     Variance: {variance:+,} records ({variance_percent:.2f}%)")
+            logger.info(
+                f"     Variance: {variance:+,} records ({variance_percent:.2f}%)"
+            )
             logger.info(f"     Success Rate: {success_rate:.2f}%")
         else:
             logger.info("  ❌ FAILED - Significant record creation failures")
-            logger.info(f"     Variance: {variance:+,} records ({variance_percent:.2f}%)")
+            logger.info(
+                f"     Variance: {variance:+,} records ({variance_percent:.2f}%)"
+            )
             logger.info(f"     Success Rate: {success_rate:.2f}%")
 
         logger.info("=" * 75)
         logger.info("\n✨ SEEDING SESSION SUMMARY:")
-        logger.info(f"  • Session Type:       {'Full Reset' if clear_first else 'Append Mode'}")
+        logger.info(
+            f"  • Session Type:       {'Full Reset' if clear_first else 'Append Mode'}"
+        )
         logger.info(f"  • Customers Seeded:   {actual_customers:,}")
         logger.info(f"  • Total Records:      {actual_total:,}")
         logger.info("  • Database Ready:     ✅ YES")

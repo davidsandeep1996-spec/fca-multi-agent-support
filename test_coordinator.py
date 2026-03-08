@@ -5,14 +5,15 @@ Agent Coordinator Test
 import asyncio
 from app.coordinator.agent_coordinator import AgentCoordinator
 
+
 async def test_coordinator():
     """Test agent coordinator."""
 
     coordinator = AgentCoordinator()
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("AGENT COORDINATOR TEST")
-    print("="*60)
+    print("=" * 60)
 
     # Simulate multi-turn conversation
     conversations = [
@@ -23,7 +24,7 @@ async def test_coordinator():
                 "What's my account balance?",
                 "Show me recent transactions",
                 "I need a statement",
-            ]
+            ],
         },
         {
             "conv_id": 2,
@@ -31,7 +32,7 @@ async def test_coordinator():
             "messages": [
                 "How do I open an account?",
                 "What fees do you charge?",
-            ]
+            ],
         },
         {
             "conv_id": 3,
@@ -39,7 +40,7 @@ async def test_coordinator():
             "messages": [
                 "I'm not happy with your service!",
                 "I want to escalate this issue",
-            ]
+            ],
         },
     ]
 
@@ -61,35 +62,36 @@ async def test_coordinator():
             print(f"Agent: {response['agent']}")
             print(f"Intent: {response['intent']}")
             print(f"Turn: {response['turn_count']}")
-            if response.get('escalation_id'):
+            if response.get("escalation_id"):
                 print(f"⚠️ Escalated: {response['escalation_id']}")
 
     # Print statistics
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("STATISTICS")
-    print("="*60)
+    print("=" * 60)
     stats = coordinator.get_statistics()
     print(f"Total Conversations: {stats['total_conversations']}")
     print(f"Total Messages: {stats['total_messages']}")
     print(f"Escalated: {stats['escalated_conversations']}")
     print(f"Avg Messages/Conversation: {stats['avg_messages_per_conversation']:.1f}")
     print("\nAgent Distribution:")
-    for agent, count in stats['agent_distribution'].items():
+    for agent, count in stats["agent_distribution"].items():
         print(f"  {agent}: {count}")
     print("\nIntent Distribution:")
-    for intent, count in stats['intent_distribution'].items():
+    for intent, count in stats["intent_distribution"].items():
         print(f"  {intent}: {count}")
 
     # Get conversation history
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("CONVERSATION HISTORY (Conv 1)")
-    print("="*60)
+    print("=" * 60)
     history = coordinator.get_conversation_history(1)
     for i, turn in enumerate(history, 1):
         print(f"\nTurn {i}:")
         print(f"  User: {turn['message']}")
         print(f"  Agent: {turn['agent']}")
         print(f"  Intent: {turn['intent']}")
+
 
 if __name__ == "__main__":
     asyncio.run(test_coordinator())

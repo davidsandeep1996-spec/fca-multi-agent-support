@@ -1,12 +1,13 @@
-
 """
 Transaction Model
 Represents financial transactions on accounts.
 """
+
 from sqlalchemy import Column, String, Numeric, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.models import BaseModel
+
 
 class Transaction(BaseModel):
     __tablename__ = "transactions"

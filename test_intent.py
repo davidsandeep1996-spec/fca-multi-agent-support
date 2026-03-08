@@ -1,6 +1,7 @@
 import asyncio
 from app.agents.intent_classifier import IntentClassifierAgent
 
+
 async def test_classifier():
     # Create agent
     agent = IntentClassifierAgent()
@@ -23,6 +24,7 @@ async def test_classifier():
         print(f"Sentiment: {response.metadata['sentiment']}")
         print(f"Routing: {response.metadata['routing']}")
         print(f"Explanation: {response.metadata['explanation']}")
+
 
 if __name__ == "__main__":
     asyncio.run(test_classifier())

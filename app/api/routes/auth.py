@@ -2,6 +2,7 @@
 Authentication Router
 Handles login and token generation.
 """
+
 from datetime import timedelta
 from typing import Any
 
@@ -19,15 +20,16 @@ from app.models.customer import Customer
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 security_service = SecurityService()
 
+
 # Schema for the Token response
 class Token(BaseModel):
     access_token: str
     token_type: str
 
+
 @router.post("/login", response_model=Token)
 async def login_for_access_token(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: AsyncSession = Depends(get_db)
+    form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)
 ) -> Any:
     """
     OAuth2 compatible token login.
@@ -51,7 +53,9 @@ async def login_for_access_token(
         )
 
     # Verify password hash
-    if not user.hashed_password or not security_service.verify_password(form_data.password, user.hashed_password):
+    if not user.hashed_password or not security_service.verify_password(
+        form_data.password, user.hashed_password
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -64,12 +68,12 @@ async def login_for_access_token(
     # We embed the customer_id, database ID, and roles into the token
     access_token = security_service.create_access_token(
         data={
-            "sub": str(user.customer_id), # Subject is the business ID
-            "id": user.id,                # Primary Key
-            "role": user.role,            # RBAC Role
-            "scopes": user.scopes         # Permissions
+            "sub": str(user.customer_id),  # Subject is the business ID
+            "id": user.id,  # Primary Key
+            "role": user.role,  # RBAC Role
+            "scopes": user.scopes,  # Permissions
         },
-        expires_delta=access_token_expires
+        expires_delta=access_token_expires,
     )
 
     return {"access_token": access_token, "token_type": "bearer"}

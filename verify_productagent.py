@@ -4,10 +4,11 @@ from app.services.product_service import ProductService
 from app.agents.product_recommender import ProductRecommenderAgent
 from app.database import AsyncSessionLocal
 
+
 async def main():
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("🔍 VERIFYING PRODUCT AGENT (DB CONNECTIVITY)")
-    print("="*60)
+    print("=" * 60)
 
     async with AsyncSessionLocal() as session:
         # 1. Initialize Service (Connected to DB)
@@ -32,13 +33,14 @@ async def main():
             print(f"✅ Agent Response Preview: {response.content[:100]}...")
 
             # Verify data source (Metadata should contain product names from DB)
-            found_products = response.metadata.get('products', [])
+            found_products = response.metadata.get("products", [])
             print(f"📦 DB Products Found: {found_products}")
 
             if not found_products:
                 print("❌ WARNING: No products found! Check DB seeding.")
             else:
                 print("✅ SUCCESS: Data fetched from Database.")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

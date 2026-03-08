@@ -46,7 +46,7 @@ class MessageService(BaseService):
         agent_name: str = None,
         intent: str = None,
         sentiment: str = None,
-        confidence_score: int = None
+        confidence_score: int = None,
     ) -> Message:
         """
         Add message to conversation.
@@ -68,8 +68,9 @@ class MessageService(BaseService):
         """
         # [SAFETY CHECK] Ensure repo is initialized
         if not self.conversation_repo or not self.repo:
-            raise RuntimeError("Service not initialized. Use 'async with' or provide db session.")
-
+            raise RuntimeError(
+                "Service not initialized. Use 'async with' or provide db session."
+            )
 
         # Verify conversation exists
         conversation = await self.conversation_repo.get_by_id(conversation_id)
@@ -97,10 +98,7 @@ class MessageService(BaseService):
         return message
 
     async def get_conversation_messages(
-        self,
-        conversation_id: int,
-        page: int = 1,
-        page_size: int = 100
+        self, conversation_id: int, page: int = 1, page_size: int = 100
     ) -> List[Message]:
         """
         Get messages for conversation.
@@ -115,7 +113,5 @@ class MessageService(BaseService):
         """
         skip = (page - 1) * page_size
         return await self.repo.get_by_conversation(
-            conversation_id,
-            skip=skip,
-            limit=page_size
+            conversation_id, skip=skip, limit=page_size
         )

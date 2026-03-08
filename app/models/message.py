@@ -16,18 +16,20 @@ from app.models import BaseModel
 # ENUMS
 # ============================================================================
 
+
 class MessageRole(str, enum.Enum):
     """Message sender role enumeration."""
 
-    CUSTOMER = "customer"      # Message from customer
-    AGENT = "agent"            # Message from AI agent
-    SYSTEM = "system"          # System message
+    CUSTOMER = "customer"  # Message from customer
+    AGENT = "agent"  # Message from AI agent
+    SYSTEM = "system"  # System message
     HUMAN_AGENT = "human_agent"  # Message from human agent
 
 
 # ============================================================================
 # MESSAGE MODEL
 # ============================================================================
+
 
 class Message(BaseModel):
     """
@@ -201,7 +203,9 @@ class Message(BaseModel):
 
     def __repr__(self) -> str:
         """String representation of message."""
-        content_preview = self.content[:50] + "..." if len(self.content) > 50 else self.content
+        content_preview = (
+            self.content[:50] + "..." if len(self.content) > 50 else self.content
+        )
         return (
             f"<Message(id={self.id}, "
             f"conversation_id={self.conversation_id}, "
@@ -237,8 +241,7 @@ class Message(BaseModel):
 
         if include_conversation and self.conversation:
             data["conversation"] = self.conversation.to_dict(
-                include_messages=False,
-                include_customer=False
+                include_messages=False, include_customer=False
             )
 
         return data

@@ -90,16 +90,11 @@ class BaseRepository(Generic[ModelType]):
         Returns:
             ModelType or None: Record if found
         """
-        result = await self.db.execute(
-            select(self.model).where(self.model.id == id)
-        )
+        result = await self.db.execute(select(self.model).where(self.model.id == id))
         return result.scalar_one_or_none()
 
     async def get_all(
-        self,
-        skip: int = 0,
-        limit: int = 100,
-        order_by: str = "id"
+        self, skip: int = 0, limit: int = 100, order_by: str = "id"
     ) -> List[ModelType]:
         """
         Get all records with pagination.
@@ -122,10 +117,7 @@ class BaseRepository(Generic[ModelType]):
         return result.scalars().all()
 
     async def get_by_filters(
-        self,
-        filters: Dict[str, Any],
-        skip: int = 0,
-        limit: int = 100
+        self, filters: Dict[str, Any], skip: int = 0, limit: int = 100
     ) -> List[ModelType]:
         """
         Get records by filters.
@@ -214,11 +206,7 @@ class BaseRepository(Generic[ModelType]):
 
         return instance
 
-    async def update_many(
-        self,
-        filters: Dict[str, Any],
-        data: Dict[str, Any]
-    ) -> int:
+    async def update_many(self, filters: Dict[str, Any], data: Dict[str, Any]) -> int:
         """
         Update multiple records.
 

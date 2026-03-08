@@ -4,6 +4,7 @@ Security Service
 Handles PII redaction and Prompt Injection detection.
 Acts as a middleware for safety guardrails.
 """
+
 import re
 from app.config import settings
 
@@ -12,8 +13,8 @@ import logging
 
 from typing import Tuple, Optional, Dict, Any
 from datetime import datetime, timedelta
-from jose import jwt, JWTError # Requires python-jose
-from passlib.context import CryptContext # Requires passlib
+from jose import jwt, JWTError  # Requires python-jose
+from passlib.context import CryptContext  # Requires passlib
 
 
 #  Import Presidio Engines
@@ -22,6 +23,7 @@ from presidio_anonymizer import AnonymizerEngine
 
 # Setup logger
 logger = logging.getLogger(__name__)
+
 
 class SecurityService:
     def __init__(self):
@@ -38,7 +40,9 @@ class SecurityService:
                 self.analyzer = None
                 self.anonymizer = None
         except Exception as e:
-            logger.warning(f"⚠️ Presidio Init Failed (Ensure 'en_core_web_lg' is installed): {e}")
+            logger.warning(
+                f"⚠️ Presidio Init Failed (Ensure 'en_core_web_lg' is installed): {e}"
+            )
             self.analyzer = None
             self.anonymizer = None
 
@@ -51,13 +55,11 @@ class SecurityService:
         self.expire_minutes = settings.access_token_expire_minutes
         self.lakera_guard_api_key = settings.lakera_guard_api_key
 
-
-
         # 1. PII Regex Patterns
         self.pii_patterns = {
-            "EMAIL": r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
-            "PHONE_UK": r'(?:(?:\+44\s?|0)(?:7\d{3}|\d{4})\s?\d{6})',
-            "CREDIT_CARD": r'\b(?:\d{4}[-\s]?){3}\d{4}\b',
+            "EMAIL": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
+            "PHONE_UK": r"(?:(?:\+44\s?|0)(?:7\d{3}|\d{4})\s?\d{6})",
+            "CREDIT_CARD": r"\b(?:\d{4}[-\s]?){3}\d{4}\b",
         }
 
         # 2. Jailbreak / Injection Keywords (Heuristic)
@@ -69,24 +71,21 @@ class SecurityService:
             "system prompt",
             "developer mode",
             "you are now",
-
             # Financial Crimes (Catches "launder money")
             "launder money",
             "money laundering",
             "forge a check",
             "bypass 2fa",
-
             # Technical/Obfuscation Attacks (Catches "Base64")
             "base64",
             "encoded string",
-
             # Persona/System Attacks (Catches "System Override", "Forget you are")
             "system override",
             "disable_content_filter",
             "unrestrained ai",
             "forget you are",
             "simulated",
-            "hypothetically" # Risky, but good for banking safety
+            "hypothetically",  # Risky, but good for banking safety
         ]
 
     def sanitize_input(self, text: str) -> str:
@@ -121,8 +120,15 @@ class SecurityService:
             # 1. Analyze (Detect)
             results = self.analyzer.analyze(
                 text=text,
-                entities=["PHONE_NUMBER", "EMAIL_ADDRESS", "CREDIT_CARD", "IBAN_CODE", "US_BANK_NUMBER", "PERSON"],
-                language='en'
+                entities=[
+                    "PHONE_NUMBER",
+                    "EMAIL_ADDRESS",
+                    "CREDIT_CARD",
+                    "IBAN_CODE",
+                    "US_BANK_NUMBER",
+                    "PERSON",
+                ],
+                language="en",
             )
 
             from presidio_anonymizer.entities import OperatorConfig
@@ -131,11 +137,15 @@ class SecurityService:
                 text=text,
                 analyzer_results=results,
                 operators={
-                    "DEFAULT": OperatorConfig("replace", {"new_value": "[CONFIDENTIAL_DATA]"}),
-                    "EMAIL_ADDRESS": OperatorConfig("replace", {"new_value": "[EMAIL]"}),
+                    "DEFAULT": OperatorConfig(
+                        "replace", {"new_value": "[CONFIDENTIAL_DATA]"}
+                    ),
+                    "EMAIL_ADDRESS": OperatorConfig(
+                        "replace", {"new_value": "[EMAIL]"}
+                    ),
                     "PHONE_NUMBER": OperatorConfig("replace", {"new_value": "[PHONE]"}),
-                    "PERSON": OperatorConfig("replace", {"new_value": "[NAME]"})
-                }
+                    "PERSON": OperatorConfig("replace", {"new_value": "[NAME]"}),
+                },
             )
 
             return anonymized_result.text
@@ -143,7 +153,6 @@ class SecurityService:
         except Exception as e:
             logger.error(f"Presidio Redaction Error: {e}")
             return text
-
 
     # ========================================================================
     # NEW: LAKERA GUARD INTEGRATION
@@ -155,7 +164,7 @@ class SecurityService:
         Returns:
             (is_safe: bool, reason: str)
         """
-# DEBUG 1: Check if key is loaded
+        # DEBUG 1: Check if key is loaded
         if not self.lakera_guard_api_key:
             print("❌ DEBUG: Lakera API Key is MISSING or Empty.")
             return True, ""
@@ -166,11 +175,7 @@ class SecurityService:
             response = requests.post(
                 "https://api.lakera.ai/v2/guard",
                 headers={"Authorization": f"Bearer {self.lakera_guard_api_key}"},
-                json={
-                    "messages": [
-                        {"role": "user", "content": text}
-                    ]
-                }
+                json={"messages": [{"role": "user", "content": text}]},
             )
 
             # DEBUG 2: Print the raw response
@@ -178,7 +183,9 @@ class SecurityService:
             print(f"📡 DEBUG: Lakera Response: {response.text}")
 
             if response.status_code != 200:
-                logger.warning(f"Lakera Guard API Warning: {response.status_code} - {response.text}")
+                logger.warning(
+                    f"Lakera Guard API Warning: {response.status_code} - {response.text}"
+                )
                 return True, ""
 
             result = response.json()
@@ -209,7 +216,7 @@ class SecurityService:
         # This provides advanced AI-based detection before falling back to heuristics
         is_safe, reason = self._check_with_lakera(sanitized_text_for_check)
         if not is_safe:
-             return False, reason
+            return False, reason
         text_lower = text.lower()
 
         # 1. Heuristic Check (Fast)
@@ -235,7 +242,9 @@ class SecurityService:
         """Generate password hash."""
         return self.pwd_context.hash(password)
 
-    def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    def create_access_token(
+        self, data: dict, expires_delta: Optional[timedelta] = None
+    ) -> str:
         """
         Create a JWT access token.
         Encodes user ID, role, and scopes.

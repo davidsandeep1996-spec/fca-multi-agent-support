@@ -5,6 +5,7 @@ General Agent Test
 import asyncio
 from app.agents.general_agent import GeneralAgent
 
+
 async def test_general_agent():
     """Test general agent."""
 
@@ -26,9 +27,9 @@ async def test_general_agent():
         "How long does transfers take?",
     ]
 
-    print("="*60)
+    print("=" * 60)
     print("FAQ MATCHING TESTS")
-    print("="*60)
+    print("=" * 60)
 
     for query in faq_queries:
         print(f"\nQuery: {query}")
@@ -36,15 +37,16 @@ async def test_general_agent():
         print(f"Source: {response.metadata.get('source')}")
         print(f"Response preview: {response.content[:100]}...")
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("GENERAL QUERY TESTS (LLM-based)")
-    print("="*60)
+    print("=" * 60)
 
     for query in general_queries:
         print(f"\nQuery: {query}")
         response = await agent.process({"message": query})
         print(f"Source: {response.metadata.get('source')}")
         print(f"Response preview: {response.content[:100]}...")
+
 
 if __name__ == "__main__":
     asyncio.run(test_general_agent())

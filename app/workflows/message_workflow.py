@@ -4,6 +4,7 @@ Message Workflow
 Multi-agent orchestration using LangGraph.
 Routes messages through Intent Classifier → Specialized Agents.
 """
+
 from typing import Dict, Any, Optional, List
 import logging
 from app.services.security_service import SecurityService
@@ -17,10 +18,6 @@ from app.agents.general_agent import GeneralAgent
 from app.agents.human_agent import HumanAgent
 from app.agents.product_recommender import ProductRecommenderAgent
 from app.agents.compliance_checker import ComplianceCheckerAgent
-
-
-
-
 
 
 class MessageWorkflow:
@@ -37,15 +34,28 @@ class MessageWorkflow:
     3. Response formatting
     """
 
-    def __init__(self, *, account_service, customer_service, transaction_service, product_service, conversation_service, faq_service, rag_service=None, checkpointer=None):
+    def __init__(
+        self,
+        *,
+        account_service,
+        customer_service,
+        transaction_service,
+        product_service,
+        conversation_service,
+        faq_service,
+        rag_service=None,
+        checkpointer=None,
+    ):
         self.intent_classifier = IntentClassifierAgent()
         self.account_agent = AccountAgent(
             account_service=account_service,
             customer_service=customer_service,
             transaction_service=transaction_service,
-            faq_service=faq_service
+            faq_service=faq_service,
         )
-        self.general_agent = GeneralAgent(faq_service=faq_service, rag_service=rag_service)
+        self.general_agent = GeneralAgent(
+            faq_service=faq_service, rag_service=rag_service
+        )
         self.product_agent = ProductRecommenderAgent(product_service=product_service)
         self.compliance_agent = ComplianceCheckerAgent()
         self.human_agent = HumanAgent(conversation_service=conversation_service)
@@ -56,7 +66,9 @@ class MessageWorkflow:
         self.security_service = SecurityService()
         # Build LangGraph workflow
         self.graph = self._build_graph()
-        self.workflow = self.graph.compile(checkpointer=self.checkpointer)# interrupt_before=["human_approval"])
+        self.workflow = self.graph.compile(
+            checkpointer=self.checkpointer
+        )  # interrupt_before=["human_approval"])
 
     def _build_graph(self):
         """Build LangGraph state machine."""
@@ -76,20 +88,13 @@ class MessageWorkflow:
         workflow.add_node("end", self._node_end)
         workflow.add_node("human_approval", self._node_human_approval)
 
-
         # Entry point
         workflow.set_entry_point("guardrail")
 
         #  Conditional Edge from Guardrail
         workflow.add_conditional_edges(
-            "guardrail",
-            self._route_guardrail,
-            {
-                "safe": "classify",
-                "unsafe": "end"
-            }
+            "guardrail", self._route_guardrail, {"safe": "classify", "unsafe": "end"}
         )
-
 
         # Conditional routing from classifier
         workflow.add_conditional_edges(
@@ -101,7 +106,7 @@ class MessageWorkflow:
                 "product": "product",
                 "complaint": "human",
                 "default": "general",
-            }
+            },
         )
 
         # Route product recommendations to compliance check
@@ -114,15 +119,11 @@ class MessageWorkflow:
 
         workflow.add_conditional_edges(
             "compliance",
-            self._route_compliance, # New router
-            {
-                "approved": "end",
-                "review": "human_approval"
-            }
+            self._route_compliance,  # New router
+            {"approved": "end", "review": "human_approval"},
         )
 
         workflow.add_edge("human_approval", "end")
-
 
         # End state
         workflow.set_finish_point("end")
@@ -139,10 +140,7 @@ class MessageWorkflow:
 
     def _get_clean_guardrail_state(self) -> Dict[str, Any]:
         """Helper to clear previous guardrail blocks from persistent state."""
-        return {
-            "agent_metadata": {"blocked": False, "violation": None},
-            "intent": None
-        }
+        return {"agent_metadata": {"blocked": False, "violation": None}, "intent": None}
 
     # ========================================================================
     # NODE IMPLEMENTATIONS
@@ -161,15 +159,21 @@ class MessageWorkflow:
         # This ensures we don't flag the user for things they said 2 minutes ago
         clean_msg = msg_lower
         if "current user message:" in clean_msg:
-             clean_msg = clean_msg.split("current user message:")[-1].strip()
+            clean_msg = clean_msg.split("current user message:")[-1].strip()
         elif "end conversation history" in clean_msg:
-             clean_msg = clean_msg.split("end conversation history")[-1].strip()
+            clean_msg = clean_msg.split("end conversation history")[-1].strip()
 
         # 1. FINANCIAL SAFETY TRAP (Applied only to the NEW message)
-        impossible_claims = ["risk-free", "risk free", "guaranteed profit", "no risk", "100% safe"]
+        impossible_claims = [
+            "risk-free",
+            "risk free",
+            "guaranteed profit",
+            "no risk",
+            "100% safe",
+        ]
 
         if any(phrase in clean_msg for phrase in impossible_claims):
-             return {
+            return {
                 "agent_type": "compliance_system",
                 "agent_response": (
                     "I cannot provide a recommendation for that specific request.\n\n"
@@ -177,13 +181,13 @@ class MessageWorkflow:
                     "All investments carry some level of risk, and their value can go down as well as up."
                 ),
                 "agent_metadata": {"blocked": True},
-                "intent": "security_violation"
-             }
+                "intent": "security_violation",
+            }
 
         # 2. SAFE BYPASS (Allows balance/transactions to skip deep security checks)
         safe_keywords = ["balance", "transaction", "statement", "account"]
         if any(kw in clean_msg for kw in safe_keywords) and len(clean_msg) < 100:
-             return self._get_clean_guardrail_state()
+            return self._get_clean_guardrail_state()
 
         # 3. DEEP SECURITY (Jailbreak check)
         is_safe, reason = self.security_service.check_jailbreak(state.message)
@@ -192,7 +196,7 @@ class MessageWorkflow:
                 "agent_type": "security_system",
                 "agent_response": "I cannot process that request due to safety guidelines.",
                 "agent_metadata": {"blocked": True},
-                "intent": "security_violation"
+                "intent": "security_violation",
             }
 
         return self._get_clean_guardrail_state()
@@ -205,14 +209,15 @@ class MessageWorkflow:
         # 1. READ from State
         message = state.message
 
-
-
         # customer_id = state.customer_id (not needed for classification logic, but available)
 
         # 2. PROCESS
-        classification = await self.intent_classifier.process({
-            "message": message,
-        },context={"conversation_history": state.history})
+        classification = await self.intent_classifier.process(
+            {
+                "message": message,
+            },
+            context={"conversation_history": state.history},
+        )
 
         intent = classification.metadata.get("intent", "general_inquiry")
         confidence = classification.confidence
@@ -223,8 +228,9 @@ class MessageWorkflow:
         return {
             "intent": intent,
             "intent_confidence": confidence,
-            "classifier_response": classification.content
+            "classifier_response": classification.content,
         }
+
     @observe(as_type="span", name="Node: Account")
     async def _node_account(self, state: WorkflowState) -> Dict[str, Any]:
         """Handle account inquiries."""
@@ -234,23 +240,25 @@ class MessageWorkflow:
         message = state.message
         customer_id = state.customer_id
 
-
-
-
         # 2. PROCESS
-        response = await self.account_agent.process({
-            "customer_id": customer_id,
-            "message": message,
-        },context={"conversation_history": state.history})
+        response = await self.account_agent.process(
+            {
+                "customer_id": customer_id,
+                "message": message,
+            },
+            context={"conversation_history": state.history},
+        )
 
-        self.logger.info(f"✅ Account query handled: {response.metadata.get('query_type')}")
+        self.logger.info(
+            f"✅ Account query handled: {response.metadata.get('query_type')}"
+        )
 
         # 3. RETURN UPDATES (Return a dict, do not mutate state)
         return {
             "agent_type": "account",
             "agent_response": response.content,
             "agent_metadata": response.metadata,
-            "confidence": response.confidence
+            "confidence": response.confidence,
         }
 
     @observe(as_type="span", name="Node: General")
@@ -262,19 +270,25 @@ class MessageWorkflow:
         message = state.message
 
         # 2. PROCESS
-        response = await self.general_agent.process({
-            "message": message,
-        },context={"conversation_history": state.history})
+        response = await self.general_agent.process(
+            {
+                "message": message,
+            },
+            context={"conversation_history": state.history},
+        )
 
-        self.logger.info(f"✅ General inquiry handled: {response.metadata.get('source')}")
+        self.logger.info(
+            f"✅ General inquiry handled: {response.metadata.get('source')}"
+        )
 
         # 3. RETURN UPDATES
         return {
             "agent_type": "general",
             "agent_response": response.content,
             "agent_metadata": response.metadata,
-            "confidence": response.confidence
+            "confidence": response.confidence,
         }
+
     @observe(as_type="span", name="Node: Product")
     async def _node_product(self, state: WorkflowState) -> Dict[str, Any]:
         """Handle product recommendations."""
@@ -285,13 +299,15 @@ class MessageWorkflow:
         customer_id = state.customer_id
         intent = state.intent
 
-
         # 2. PROCESS
-        response = await self.product_agent.process({
-            "customer_id": customer_id,
-            "message": message,
-            "intent": intent,
-        },context={"conversation_history": state.history})
+        response = await self.product_agent.process(
+            {
+                "customer_id": customer_id,
+                "message": message,
+                "intent": intent,
+            },
+            context={"conversation_history": state.history},
+        )
 
         self.logger.info("✅ Product recommendation generated")
 
@@ -300,23 +316,25 @@ class MessageWorkflow:
             "agent_type": "product",
             "agent_response": response.content,
             "agent_metadata": response.metadata,
-            "confidence": response.confidence
+            "confidence": response.confidence,
         }
+
     @observe(as_type="span", name="Node: Compliance")
     async def _node_compliance(self, state: WorkflowState) -> Dict[str, Any]:
         """Check compliance of product recommendations."""
         self.logger.info("⚖️ Checking FCA compliance...")
-
 
         # 1. READ from State
         agent_response = state.agent_response
         products = state.agent_metadata.get("products")
 
         # 2. PROCESS
-        response = await self.compliance_agent.process({
-            "content": agent_response,
-            "product_type": products,
-        })
+        response = await self.compliance_agent.process(
+            {
+                "content": agent_response,
+                "product_type": products,
+            }
+        )
 
         is_compliant = response.metadata.get("is_compliant")
         required_disclaimers = response.metadata.get("required_disclaimers", [])
@@ -327,30 +345,36 @@ class MessageWorkflow:
 
         # Auto-resolve minor issues
         if not is_compliant and not prohibited:
-             self.logger.info("⚠️ Auto-resolving minor compliance issues to avoid Human Loop")
-             is_compliant = True
+            self.logger.info(
+                "⚠️ Auto-resolving minor compliance issues to avoid Human Loop"
+            )
+            is_compliant = True
 
         # [CRITICAL] Safe Fallback: If it's a standard loan request, force approval.
         # This prevents the demo from blocking valid Personal Loans due to False Positives.
         if self._evaluate_demo_overrides(state.message, prohibited):
-             self.logger.info("✅ Force-approving loan request (Demo Override)")
-             is_compliant = True
+            self.logger.info("✅ Force-approving loan request (Demo Override)")
+            is_compliant = True
 
         # Prepare updates
         updates = {
             "compliance_check": response.content,
             "is_compliant": is_compliant,
-            "required_disclaimers": required_disclaimers
+            "required_disclaimers": required_disclaimers,
         }
 
         # Logic: Append disclaimers
         if required_disclaimers:
             disclaimers = "\n\n".join(required_disclaimers)
-            updates["agent_response"] = f"{agent_response}\n\n⚠️ Important:\n{disclaimers}"
+            updates["agent_response"] = (
+                f"{agent_response}\n\n⚠️ Important:\n{disclaimers}"
+            )
 
         # Only block if it is STILL false (meaning Prohibited words were found)
         if not is_compliant:
-            updates["agent_response"] = "I cannot recommend this product due to compliance restrictions (Prohibited Language)."
+            updates["agent_response"] = (
+                "I cannot recommend this product due to compliance restrictions (Prohibited Language)."
+            )
 
         return updates
 
@@ -376,21 +400,27 @@ class MessageWorkflow:
         full_prompt = f"{history_context}CURRENT USER MESSAGE: {message}"
 
         # 2. PROCESS
-        response = await self.human_agent.process({
-            "message": full_prompt,
-            "customer_id": customer_id,
-            "conversation_id": conversation_id,
-        }, context=context)
+        response = await self.human_agent.process(
+            {
+                "message": full_prompt,
+                "customer_id": customer_id,
+                "conversation_id": conversation_id,
+            },
+            context=context,
+        )
 
-        self.logger.info(f"✅ Escalation created: {response.metadata.get('escalation_id')}")
+        self.logger.info(
+            f"✅ Escalation created: {response.metadata.get('escalation_id')}"
+        )
 
         # 3. RETURN UPDATES
         return {
             "agent_type": "human",
             "agent_response": response.content,
             "agent_metadata": response.metadata,
-            "confidence": response.confidence
+            "confidence": response.confidence,
         }
+
     @observe(as_type="span", name="Node: End")
     async def _node_end(self, state: WorkflowState) -> Dict[str, Any]:
         """Final response formatting."""
@@ -407,14 +437,13 @@ class MessageWorkflow:
                 "agent_metadata": state.agent_metadata,
                 "is_compliant": state.is_compliant,
                 "escalation_id": state.agent_metadata.get("escalation_id"),
-            }
+            },
         }
 
         self.logger.info("✅ Response ready to send")
 
         # 3. RETURN UPDATES
         return {"final_response": final_response}
-
 
     async def _node_human_approval(self, state: WorkflowState) -> Dict[str, Any]:
         """
@@ -437,7 +466,6 @@ class MessageWorkflow:
             "account_data": "account",
             "general_inquiry": "general",
             "knowledge_inquiry": "general",
-
             "product_acquisition": "product",
             "credit_card": "product",
             "complaint": "complaint",
@@ -461,7 +489,7 @@ class MessageWorkflow:
         customer_id: int,
         conversation_id: int = 0,
         context: Optional[Dict[str, Any]] = None,
-        history: List[Dict[str, str]] = None
+        history: List[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
         """
         Process message through workflow.
@@ -487,7 +515,7 @@ class MessageWorkflow:
             "customer_id": customer_id,
             "conversation_id": conversation_id,
             "context": context or {},
-            "history": history or []
+            "history": history or [],
         }
 
         # Run workflow
@@ -504,10 +532,8 @@ class MessageWorkflow:
                 "agent": "system",
                 "intent": final_state.get("intent"),
                 "confidence": final_state.get("confidence"),
-                "status": "paused", # Signal to coordinator
-                "metadata": {
-                    "escalation_id": "PENDING_REVIEW"
-                }
+                "status": "paused",  # Signal to coordinator
+                "metadata": {"escalation_id": "PENDING_REVIEW"},
             }
 
         return final_state.get("final_response")
@@ -579,7 +605,7 @@ class MessageWorkflow:
 
         # Use robust delimiters
         return (
-            "=== START CONVERSATION HISTORY ===\n" +
-            "\n".join(formatted) +
-            "\n=== END CONVERSATION HISTORY ===\n\n"
+            "=== START CONVERSATION HISTORY ===\n"
+            + "\n".join(formatted)
+            + "\n=== END CONVERSATION HISTORY ===\n\n"
         )

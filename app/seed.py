@@ -112,6 +112,7 @@ SAMPLE_MESSAGES = [
 # SEEDING FUNCTIONS
 # ============================================================================
 
+
 async def seed_customers() -> list:
     """
     Seed sample customers.
@@ -128,12 +129,15 @@ async def seed_customers() -> list:
             try:
                 customer = await service.create_customer(**data)
                 customer_ids.append(customer.id)
-                logger.info(f"Created customer: {customer.full_name} ({customer.email})")
+                logger.info(
+                    f"Created customer: {customer.full_name} ({customer.email})"
+                )
             except ValueError as e:
                 logger.warning(f"Skipped customer {data['email']}: {e}")
 
     logger.info(f"Seeded {len(customer_ids)} customers")
     return customer_ids
+
 
 async def seed_conversations(customer_ids: list) -> list:
     """
@@ -155,9 +159,7 @@ async def seed_conversations(customer_ids: list) -> list:
             customer_id = customer_ids[i % len(customer_ids)]
 
             conversation = await service.start_conversation(
-                customer_id=customer_id,
-                title=data["title"],
-                channel=data["channel"]
+                customer_id=customer_id, title=data["title"], channel=data["channel"]
             )
 
             # Update intent if provided
@@ -172,6 +174,7 @@ async def seed_conversations(customer_ids: list) -> list:
 
     logger.info(f"Seeded {len(conversation_ids)} conversations")
     return conversation_ids
+
 
 async def seed_messages(conversation_ids: list):
     """
@@ -192,14 +195,14 @@ async def seed_messages(conversation_ids: list):
             conversation_id = conversation_ids[i]
 
             for msg_data in messages:
-                await service.add_message(
-                    conversation_id=conversation_id,
-                    **msg_data
-                )
+                await service.add_message(conversation_id=conversation_id, **msg_data)
                 message_count += 1
-                logger.info(f"Created message: {msg_data['role'].value} - {msg_data['content'][:50]}...")
+                logger.info(
+                    f"Created message: {msg_data['role'].value} - {msg_data['content'][:50]}..."
+                )
 
     logger.info(f"Seeded {message_count} messages")
+
 
 async def clear_database():
     """
@@ -219,9 +222,11 @@ async def clear_database():
 
     logger.info("Database cleared")
 
+
 # ============================================================================
 # MAIN SEEDING FUNCTION
 # ============================================================================
+
 
 async def seed_all(clear_first: bool = False):
     """
@@ -246,6 +251,7 @@ async def seed_all(clear_first: bool = False):
     except Exception as e:
         logger.error(f"❌ Error seeding database: {e}", exc_info=True)
         raise
+
 
 # ============================================================================
 # CLI ENTRY POINT

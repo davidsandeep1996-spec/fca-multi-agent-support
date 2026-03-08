@@ -2,17 +2,20 @@
 Product Repository
 Data access layer for Product model.
 """
+
 from typing import List
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.product import Product
 from app.repositories.base import BaseRepository
 
+
 class ProductRepository(BaseRepository[Product]):
     """
     Product repository.
     Handles database operations for financial products.
     """
+
     def __init__(self, db: AsyncSession):
         super().__init__(Product, db)
 

@@ -6,6 +6,7 @@ from app.config import settings
 # Forcefully silence Langfuse background logs
 logging.getLogger("langfuse").setLevel(logging.CRITICAL)
 
+
 @pytest_asyncio.fixture
 async def db_session():
     """Single, isolated DB session for each test. Guaranteed to prevent loop mismatch."""
@@ -18,7 +19,7 @@ async def db_session():
             bind=conn,
             class_=AsyncSession,
             expire_on_commit=False,
-            join_transaction_mode="create_savepoint"
+            join_transaction_mode="create_savepoint",
         )
 
         # 3. Yield session to the test

@@ -2,16 +2,18 @@
 VERIFY HITL (Human-in-the-Loop)
 Tests the pause/resume functionality of the Admin API.
 """
+
 import asyncio
 import sys
 from httpx import AsyncClient
 from app.main import app
 from app.database import check_db_connection
 
+
 async def run_hitl_verification():
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("👮 HITL & ADMIN API TEST")
-    print("="*60)
+    print("=" * 60)
 
     async with AsyncClient(app=app, base_url="http://test") as client:
         print("✅ AsyncClient Initialized")
@@ -31,15 +33,18 @@ async def run_hitl_verification():
             json={
                 "message": message_text,
                 "customer_id": customer_id,
-                "conversation_id": conversation_id
-            }
+                "conversation_id": conversation_id,
+            },
         )
 
         data = response.json()
 
         # 2. Verify Pause State
         # We check if the status is 'paused' OR if the response contains our "approval" message
-        if data.get("status") == "paused" or "approval" in data.get("response", "").lower():
+        if (
+            data.get("status") == "paused"
+            or "approval" in data.get("response", "").lower()
+        ):
             print("✅ PASS: Workflow Paused!")
             print(f"   🤖 System Response: {data['response']}")
 
@@ -54,7 +59,9 @@ async def run_hitl_verification():
             print("⚠️  WARNING: Workflow did NOT pause.")
             print(f"   Status: {data.get('status')}")
             print(f"   Response: {data.get('response')}")
-            print("   (If compliance passed automatically, we cannot test the Resume feature.)")
+            print(
+                "   (If compliance passed automatically, we cannot test the Resume feature.)"
+            )
             return
 
         # 3. Approve via Admin API
@@ -62,19 +69,20 @@ async def run_hitl_verification():
 
         admin_payload = {
             "conversation_id": real_conv_id,
-            "approved_response": "I have approved your loan request. You can proceed with the application."
+            "approved_response": "I have approved your loan request. You can proceed with the application.",
         }
 
         admin_response = await client.post(
-            "/api/v1/admin/interventions/approve",
-            json=admin_payload
+            "/api/v1/admin/interventions/approve", json=admin_payload
         )
 
         if admin_response.status_code == 200:
             res_data = admin_response.json()
             print("✅ PASS: Admin Approval Accepted")
             print(f"   🔄 Workflow Status: {res_data.get('status')}")
-            print(f"   📄 Final Response: {res_data.get('final_response', {}).get('message')}")
+            print(
+                f"   📄 Final Response: {res_data.get('final_response', {}).get('message')}"
+            )
         else:
             print(f"❌ FAIL: Admin API Error: {admin_response.text}")
             sys.exit(1)
@@ -87,9 +95,10 @@ async def run_hitl_verification():
         # We expect at least: User Message + System/Hold Message + Agent Final Message
         print(f"   Found {len(history)} messages in history.")
         if len(history) >= 2:
-             print("✅ PASS: Conversation history preserved.")
+            print("✅ PASS: Conversation history preserved.")
         else:
-             print("⚠️  WARNING: History seems incomplete.")
+            print("⚠️  WARNING: History seems incomplete.")
+
 
 if __name__ == "__main__":
     loop = asyncio.new_event_loop()

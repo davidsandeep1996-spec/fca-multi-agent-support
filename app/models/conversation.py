@@ -16,28 +16,30 @@ from app.models import BaseModel
 # ENUMS
 # ============================================================================
 
+
 class ConversationStatus(str, enum.Enum):
     """Conversation status enumeration."""
 
-    ACTIVE = "active"          # Conversation ongoing
-    RESOLVED = "resolved"      # Issue resolved
-    ESCALATED = "escalated"    # Escalated to human agent
-    CLOSED = "closed"          # Conversation closed
+    ACTIVE = "active"  # Conversation ongoing
+    RESOLVED = "resolved"  # Issue resolved
+    ESCALATED = "escalated"  # Escalated to human agent
+    CLOSED = "closed"  # Conversation closed
 
 
 class ConversationChannel(str, enum.Enum):
     """Conversation channel enumeration."""
 
-    WEB = "web"                # Web chat
-    MOBILE = "mobile"          # Mobile app
-    API = "api"                # API integration
-    WHATSAPP = "whatsapp"      # WhatsApp integration
-    SMS = "sms"                # SMS integration
+    WEB = "web"  # Web chat
+    MOBILE = "mobile"  # Mobile app
+    API = "api"  # API integration
+    WHATSAPP = "whatsapp"  # WhatsApp integration
+    SMS = "sms"  # SMS integration
 
 
 # ============================================================================
 # CONVERSATION MODEL
 # ============================================================================
+
 
 class Conversation(BaseModel):
     """
@@ -216,7 +218,9 @@ class Conversation(BaseModel):
             f"messages={self.message_count})>"
         )
 
-    def to_dict(self, include_messages: bool = False, include_customer: bool = False) -> dict:
+    def to_dict(
+        self, include_messages: bool = False, include_customer: bool = False
+    ) -> dict:
         """
         Convert conversation to dictionary.
 
@@ -247,10 +251,7 @@ class Conversation(BaseModel):
             data["customer"] = self.customer.to_dict(include_conversations=False)
 
         if include_messages:
-            data["messages"] = [
-                msg.to_dict()
-                for msg in self.messages
-            ]
+            data["messages"] = [msg.to_dict() for msg in self.messages]
 
         return data
 
@@ -273,7 +274,13 @@ class Conversation(BaseModel):
         if summary:
             self.summary = summary
 
-    def escalate(self, reason: str, priority: str = None, assigned_group: str = None, ticket_id: str = None) -> None:
+    def escalate(
+        self,
+        reason: str,
+        priority: str = None,
+        assigned_group: str = None,
+        ticket_id: str = None,
+    ) -> None:
         """
         Escalate conversation to human agent.
 

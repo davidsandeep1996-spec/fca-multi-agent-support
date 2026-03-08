@@ -20,10 +20,7 @@ class MessageRepository(BaseRepository[Message]):
         super().__init__(Message, db)
 
     async def get_by_conversation(
-        self,
-        conversation_id: int,
-        skip: int = 0,
-        limit: int = 100
+        self, conversation_id: int, skip: int = 0, limit: int = 100
     ) -> List[Message]:
         """
         Get messages for conversation.
@@ -46,9 +43,7 @@ class MessageRepository(BaseRepository[Message]):
         return result.scalars().all()
 
     async def get_requiring_human(
-        self,
-        skip: int = 0,
-        limit: int = 100
+        self, skip: int = 0, limit: int = 100
     ) -> List[Message]:
         """
         Get messages requiring human intervention.

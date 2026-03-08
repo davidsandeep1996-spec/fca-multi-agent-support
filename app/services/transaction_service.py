@@ -4,6 +4,7 @@ from app.services.base import BaseService
 from app.repositories.transaction import TransactionRepository
 from app.models.transaction import Transaction
 
+
 class TransactionService(BaseService):
     def __init__(self, db: AsyncSession = None):
         super().__init__(db)
@@ -15,6 +16,8 @@ class TransactionService(BaseService):
         self.repo = TransactionRepository(self.db)
         return self
 
-    async def get_transactions_by_account(self, account_id: int, limit: int = 10) -> List[Transaction]:
+    async def get_transactions_by_account(
+        self, account_id: int, limit: int = 10
+    ) -> List[Transaction]:
         """Get recent transactions for an account."""
         return await self.repo.get_by_account_id(account_id, limit)

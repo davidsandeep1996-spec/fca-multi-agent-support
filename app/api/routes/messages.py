@@ -11,7 +11,7 @@ from typing import Optional, Dict, Any
 import logging
 
 from app.coordinator.agent_coordinator import AgentCoordinator
-from app.api.deps import get_current_active_user # [CHANGE 2a] Import dependency
+from app.api.deps import get_current_active_user  # [CHANGE 2a] Import dependency
 from app.models.customer import Customer
 
 router = APIRouter(prefix="/api/v1", tags=["messages"])
@@ -23,9 +23,11 @@ logger = logging.getLogger(__name__)
 # REQUEST/RESPONSE MODELS
 # ============================================================================
 
+
 #  Update Pydantic Models for Chat History
 class ChatMessageItem(BaseModel):
     """Single message in history."""
+
     id: Optional[int] = None
     role: str
     content: str
@@ -36,6 +38,7 @@ class ChatMessageItem(BaseModel):
 
 class MessageRequest(BaseModel):
     """Incoming message request."""
+
     message: str
     customer_id: int
     conversation_id: int
@@ -43,6 +46,7 @@ class MessageRequest(BaseModel):
 
 class AgentMetadata(BaseModel):
     """Agent response metadata."""
+
     agent: str
     intent: str
     confidence: float
@@ -53,6 +57,7 @@ class AgentMetadata(BaseModel):
 
 class MessageResponse(BaseModel):
     """API response."""
+
     response: str
     status: str = "success"
 
@@ -68,13 +73,12 @@ class MessageResponse(BaseModel):
     turn_count: int = 0
 
     # [FIX] Allow extra fields just in case
-    model_config = {
-        "extra": "ignore"
-    }
+    model_config = {"extra": "ignore"}
 
 
 class ConversationHistoryItem(BaseModel):
     """Single conversation turn."""
+
     timestamp: str
     message: str
     agent: str
@@ -84,12 +88,14 @@ class ConversationHistoryItem(BaseModel):
 
 class ConversationHistory(BaseModel):
     """Conversation history response."""
+
     conversation_id: int
     history: list[ChatMessageItem]
 
 
 class ConversationStats(BaseModel):
     """Conversation statistics."""
+
     total_conversations: int
     total_messages: int
     escalated_conversations: int
@@ -102,8 +108,14 @@ class ConversationStats(BaseModel):
 # MESSAGE ENDPOINTS
 # ============================================================================
 
+
 @router.post("/messages/process")
-async def process_message(request: MessageRequest, current_user: Customer = Security(get_current_active_user, scopes=["read:accounts"])) -> MessageResponse:
+async def process_message(
+    request: MessageRequest,
+    current_user: Customer = Security(
+        get_current_active_user, scopes=["read:accounts"]
+    ),
+) -> MessageResponse:
     """
     Process customer message through agent system.
 
@@ -123,9 +135,14 @@ async def process_message(request: MessageRequest, current_user: Customer = Secu
     """
     try:
         if request.customer_id != current_user.id:
-             logger.critical(f"ID Mismatch: Token={current_user.id}, Request={request.customer_id}")
-             raise HTTPException(status_code=403, detail=f"Access Denied: You cannot access customer {request.customer_id}'s data.")
-             # We allow it for now for testing, or you can raise 403
+            logger.critical(
+                f"ID Mismatch: Token={current_user.id}, Request={request.customer_id}"
+            )
+            raise HTTPException(
+                status_code=403,
+                detail=f"Access Denied: You cannot access customer {request.customer_id}'s data.",
+            )
+            # We allow it for now for testing, or you can raise 403
         logger.info(f"Processing message for customer {request.customer_id}")
 
         # Process through coordinator
@@ -140,24 +157,21 @@ async def process_message(request: MessageRequest, current_user: Customer = Secu
 
         return MessageResponse(
             response=response["response"],
-
             # 1. CRITICAL FIX: Pass conversation_id at the TOP LEVEL
             conversation_id=response["conversation_id"],
-
             # 2. Map other top-level fields defined in your Schema
             agent=response.get("agent", "system"),
             intent=response.get("intent"),
             confidence=response.get("confidence", 0.0),
             turn_count=response.get("turn_count", 0),
             status=response.get("status", "success"),
-
             # 3. Pass everything else (including escalation_id) into metadata
             metadata={
                 "escalated": response.get("escalated", False),
                 "escalation_id": response.get("escalation_id"),
                 # Merge with any existing metadata from the agent (like violation details)
-                **response.get("metadata", {})
-            }
+                **response.get("metadata", {}),
+            },
         )
 
     except ValueError as e:
@@ -165,15 +179,20 @@ async def process_message(request: MessageRequest, current_user: Customer = Secu
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Processing error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error processing message: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error processing message: {str(e)}"
+        )
 
 
 # ============================================================================
 # CONVERSATION ENDPOINTS
 # ============================================================================
 
+
 #  Update History Endpoint to use DB
-@router.get("/conversations/{conversation_id}/history", response_model=ConversationHistory)
+@router.get(
+    "/conversations/{conversation_id}/history", response_model=ConversationHistory
+)
 async def get_conversation_history(
     conversation_id: int,
     limit: int = 50,
@@ -184,7 +203,9 @@ async def get_conversation_history(
     try:
         # Call the new Async DB method
         if hasattr(coordinator, "get_db_conversation_history"):
-            history = await coordinator.get_db_conversation_history(conversation_id, limit)
+            history = await coordinator.get_db_conversation_history(
+                conversation_id, limit
+            )
         else:
             # Fallback if you renamed it in the class
             history = await coordinator.get_conversation_history(conversation_id, limit)
@@ -201,6 +222,7 @@ async def get_conversation_history(
         logger.error(f"History retrieval error: {e}")
         raise HTTPException(status_code=500, detail="Error retrieving history")
 
+
 #  Update Customer Conversations Endpoint to use DB
 @router.get("/customers/{customer_id}/conversations")
 async def get_customer_conversations(customer_id: int) -> Dict[str, Any]:
@@ -211,18 +233,17 @@ async def get_customer_conversations(customer_id: int) -> Dict[str, Any]:
         # Call the new Async DB method
         conversations = await coordinator.get_db_customer_conversations(customer_id)
 
-        return {
-            "customer_id": customer_id,
-            "conversations": conversations
-        }
+        return {"customer_id": customer_id, "conversations": conversations}
 
     except Exception as e:
         logger.error(f"Error retrieving conversations: {e}")
         raise HTTPException(status_code=500, detail="Error retrieving conversations")
 
+
 # ============================================================================
 # ESCALATION ENDPOINTS
 # ============================================================================
+
 
 @router.get("/escalations")
 async def get_escalated_conversations() -> Dict[str, Any]:
@@ -282,6 +303,7 @@ async def resolve_escalation(
 # STATISTICS ENDPOINTS
 # ============================================================================
 
+
 @router.get("/statistics", response_model=ConversationStats)
 async def get_statistics() -> ConversationStats:
     """
@@ -320,6 +342,7 @@ async def get_coordinator_info() -> Dict[str, Any]:
 # ============================================================================
 # HEALTH CHECK
 # ============================================================================
+
 
 @router.get("/health")
 async def health_check() -> Dict[str, str]:

@@ -1,11 +1,13 @@
 """
 FAQ Repository
 """
+
 from typing import List
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.faq import FAQ
 from app.repositories.base import BaseRepository
+
 
 class FAQRepository(BaseRepository[FAQ]):
     def __init__(self, db: AsyncSession):
@@ -22,7 +24,7 @@ class FAQRepository(BaseRepository[FAQ]):
                 or_(
                     FAQ.question.ilike(term),
                     FAQ.keywords.ilike(term),
-                    FAQ.category.ilike(term)
+                    FAQ.category.ilike(term),
                 )
             )
             .where(FAQ.is_active.is_(True))

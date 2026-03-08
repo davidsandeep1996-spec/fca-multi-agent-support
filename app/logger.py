@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 import json
-from datetime import datetime,timezone
+from datetime import datetime, timezone
 
 from app.config import settings
 
@@ -20,6 +20,7 @@ from app.config import settings
 # ============================================================================
 # JSON FORMATTER (Simple Implementation)
 # ============================================================================
+
 
 class JSONFormatter(logging.Formatter):
     """
@@ -62,6 +63,7 @@ class JSONFormatter(logging.Formatter):
 # ============================================================================
 # LOGGING SETUP
 # ============================================================================
+
 
 def setup_logging(
     log_level: Optional[str] = None,
@@ -163,6 +165,7 @@ def setup_logging(
 # ============================================================================
 # LOGGING HELPERS
 # ============================================================================
+
 
 def get_logger(name: str) -> logging.Logger:
     """

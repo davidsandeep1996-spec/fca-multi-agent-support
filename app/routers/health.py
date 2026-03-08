@@ -9,7 +9,7 @@ from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Dict, Any
-from datetime import datetime,timezone
+from datetime import datetime, timezone
 import logging
 
 from app.config import settings
@@ -24,6 +24,7 @@ router = APIRouter()
 # ============================================================================
 # RESPONSE MODELS
 # ============================================================================
+
 
 class HealthResponse(BaseModel):
     """Health check response model."""
@@ -45,6 +46,7 @@ class PingResponse(BaseModel):
 # ============================================================================
 # ENDPOINTS
 # ============================================================================
+
 
 @router.get(
     "/health",
@@ -164,7 +166,7 @@ async def readiness() -> Dict[str, Any]:
     if is_ready:
         return {
             "status": "ready",
-            "timestamp":datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         }
     else:
         return JSONResponse(
@@ -172,7 +174,9 @@ async def readiness() -> Dict[str, Any]:
             content={
                 "status": "not_ready",
                 "reason": "database_unhealthy",
-                "timestamp":datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "timestamp": datetime.now(timezone.utc)
+                .isoformat()
+                .replace("+00:00", "Z"),
             },
         )
 
@@ -196,5 +200,5 @@ async def liveness() -> Dict[str, str]:
     """
     return {
         "status": "alive",
-        "timestamp":datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     }

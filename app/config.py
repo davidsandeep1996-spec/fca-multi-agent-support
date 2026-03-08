@@ -35,8 +35,7 @@ class Settings(BaseSettings):
         description="Application version (semantic versioning)",
     )
 
-    environment: Literal["development", "staging", "production",
-                         "test"] = Field(
+    environment: Literal["development", "staging", "production", "test"] = Field(
         default="development",
         description="Current environment",
     )
@@ -206,7 +205,6 @@ class Settings(BaseSettings):
         ge=1,
         description="Seconds to wait before trying again (Half-Open state)",
     )
-
 
     # ========================================================================
     # LOGGING SETTINGS
@@ -410,6 +408,7 @@ class Settings(BaseSettings):
                 "handlers": ["console", "file"],
             },
         }
+
     #  Add computed property for observability
     @property
     def is_observability_enabled(self) -> bool:
@@ -429,6 +428,7 @@ settings = Settings()
 # ============================================================================
 # SETTINGS DISPLAY (for debugging)
 # ============================================================================
+
 
 def display_settings():
     """
@@ -464,7 +464,9 @@ def display_settings():
 
     print("\nGroq AI:")
     # Mask API key
-    key_display = f"{settings.groq_api_key[:8]}****" if settings.groq_api_key else "NOT SET"
+    key_display = (
+        f"{settings.groq_api_key[:8]}****" if settings.groq_api_key else "NOT SET"
+    )
     print(f"  API Key: {key_display}")
     print(f"  Model: {settings.groq_model}")
     print(f"  Temperature: {settings.groq_temperature}")

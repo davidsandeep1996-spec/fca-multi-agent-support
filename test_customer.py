@@ -14,6 +14,7 @@ from app.services.customer import CustomerService
 # CREATE TESTS
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_create_customer(db_session: AsyncSession):
     """Test creating a customer."""
@@ -24,7 +25,7 @@ async def test_create_customer(db_session: AsyncSession):
         first_name="John",
         last_name="Smith",
         email="john4@example.com",
-        phone="+44123456789"
+        phone="+44123456789",
     )
 
     assert customer.id is not None
@@ -48,7 +49,7 @@ async def test_create_customer_duplicate_email(db_session: AsyncSession):
         customer_id="CUST-003",
         first_name="John",
         last_name="Smith",
-        email="john4@example.com"
+        email="john4@example.com",
     )
 
     # Try to create second customer with same email
@@ -57,13 +58,14 @@ async def test_create_customer_duplicate_email(db_session: AsyncSession):
             customer_id="CUST-003",
             first_name="Jane",
             last_name="Doe",
-            email="john4@example.com"
+            email="john4@example.com",
         )
 
 
 # ============================================================================
 # READ TESTS
 # ============================================================================
+
 
 @pytest.mark.asyncio
 async def test_get_customer(db_session: AsyncSession):
@@ -75,7 +77,7 @@ async def test_get_customer(db_session: AsyncSession):
         customer_id="CUST-006",
         first_name="John",
         last_name="Smith",
-        email="john6@example.com"
+        email="john6@example.com",
     )
 
     # Get customer
@@ -96,7 +98,7 @@ async def test_get_customer_by_email(db_session: AsyncSession):
         customer_id="CUST-001",
         first_name="John",
         last_name="Smith",
-        email="john@example.com"
+        email="john@example.com",
     )
 
     # Get by email
@@ -116,14 +118,14 @@ async def test_search_customers(db_session: AsyncSession):
         customer_id="CUST-001",
         first_name="John",
         last_name="Smith",
-        email="john@example.com"
+        email="john@example.com",
     )
 
     await service.create_customer(
         customer_id="CUST-002",
         first_name="Jane",
         last_name="Johnson",
-        email="jane@example.com"
+        email="jane@example.com",
     )
 
     # Search for "john"
@@ -138,6 +140,7 @@ async def test_search_customers(db_session: AsyncSession):
 # UPDATE TESTS
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_update_customer(db_session: AsyncSession):
     """Test updating customer."""
@@ -148,13 +151,12 @@ async def test_update_customer(db_session: AsyncSession):
         customer_id="CUST-001",
         first_name="John",
         last_name="Smith",
-        email="john@example.com"
+        email="john@example.com",
     )
 
     # Update customer
     updated = await service.update_customer(
-        customer.id,
-        {"first_name": "Jane", "phone": "+44123456789"}
+        customer.id, {"first_name": "Jane", "phone": "+44123456789"}
     )
 
     assert updated is not None
@@ -173,7 +175,7 @@ async def test_verify_customer(db_session: AsyncSession):
         customer_id="CUST-001",
         first_name="John",
         last_name="Smith",
-        email="john@example.com"
+        email="john@example.com",
     )
 
     assert customer.is_verified is False
@@ -195,7 +197,7 @@ async def test_make_vip(db_session: AsyncSession):
         customer_id="CUST-001",
         first_name="John",
         last_name="Smith",
-        email="john@example.com"
+        email="john@example.com",
     )
 
     assert customer.is_vip is False
@@ -211,6 +213,7 @@ async def test_make_vip(db_session: AsyncSession):
 # DELETE TESTS
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_delete_customer(db_session: AsyncSession):
     """Test deleting customer."""
@@ -221,7 +224,7 @@ async def test_delete_customer(db_session: AsyncSession):
         customer_id="CUST-001",
         first_name="John",
         last_name="Smith",
-        email="john@example.com"
+        email="john@example.com",
     )
 
     customer_id = customer.id
@@ -240,6 +243,7 @@ async def test_delete_customer(db_session: AsyncSession):
 # PROPERTY TESTS
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_customer_full_name(db_session: AsyncSession):
     """Test customer full_name property."""
@@ -249,7 +253,7 @@ async def test_customer_full_name(db_session: AsyncSession):
         customer_id="CUST-001",
         first_name="John",
         last_name="Smith",
-        email="john@example.com"
+        email="john@example.com",
     )
 
     assert customer.full_name == "John Smith"

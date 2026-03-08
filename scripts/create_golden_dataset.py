@@ -3,6 +3,7 @@ Create Golden Dataset
 Generates a static JSON file with 50 'Golden' questions and expected intents
 for regression testing.
 """
+
 import json
 import os
 
@@ -24,13 +25,15 @@ GOLDEN_DATA = [
     {"q": "How much interest have I earned?", "intent": "account_inquiry"},
     {"q": "What's my available credit?", "intent": "account_inquiry"},
     {"q": "Balance check please", "intent": "account_inquiry"},
-
     # --- PRODUCT INQUIRY (15) ---
     {"q": "I want to apply for a personal loan", "intent": "loan_inquiry"},
     {"q": "What are your mortgage rates?", "intent": "loan_inquiry"},
     {"q": "Tell me about your credit cards", "intent": "product_inquiry"},
     {"q": "Do you offer student loans?", "intent": "loan_inquiry"},
-    {"q": "I need a high interest savings account", "intent": "product_inquiry"}, # May map to savings_inquiry
+    {
+        "q": "I need a high interest savings account",
+        "intent": "product_inquiry",
+    },  # May map to savings_inquiry
     {"q": "What are the terms for a fixed rate mortgage?", "intent": "loan_inquiry"},
     {"q": "Can I get a loan for a new car?", "intent": "loan_inquiry"},
     {"q": "Compare your credit card options", "intent": "product_inquiry"},
@@ -41,7 +44,6 @@ GOLDEN_DATA = [
     {"q": "I am looking for a travel insurance product", "intent": "product_inquiry"},
     {"q": "What investment products do you have?", "intent": "product_inquiry"},
     {"q": "I want to borrow 5000 pounds", "intent": "loan_inquiry"},
-
     # --- GENERAL INQUIRY (10) ---
     {"q": "What are your opening hours?", "intent": "general_inquiry"},
     {"q": "Where is the nearest branch?", "intent": "general_inquiry"},
@@ -53,7 +55,6 @@ GOLDEN_DATA = [
     {"q": "Are you open on bank holidays?", "intent": "general_inquiry"},
     {"q": "What documents do I need to join?", "intent": "general_inquiry"},
     {"q": "Is there parking at the city branch?", "intent": "general_inquiry"},
-
     # --- COMPLAINT / HUMAN (10) ---
     {"q": "I want to speak to a human", "intent": "complaint"},
     {"q": "This service is terrible, let me talk to a manager", "intent": "complaint"},
@@ -67,6 +68,7 @@ GOLDEN_DATA = [
     {"q": "This information is wrong, who can I call?", "intent": "complaint"},
 ]
 
+
 def generate_file():
     file_path = os.path.join(os.path.dirname(__file__), "golden_questions.json")
 
@@ -78,6 +80,7 @@ def generate_file():
         json.dump(GOLDEN_DATA, f, indent=2)
 
     print(f"✅ Generated {len(GOLDEN_DATA)} Golden Questions at: {file_path}")
+
 
 if __name__ == "__main__":
     generate_file()

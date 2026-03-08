@@ -49,7 +49,7 @@ class CustomerService(BaseService):
         is_vip: bool = False,
         hashed_password: str = None,
         role: str = "user",
-        scopes: str = "read:accounts"
+        scopes: str = "read:accounts",
     ) -> Customer:
         """
         Create new customer.
@@ -92,7 +92,7 @@ class CustomerService(BaseService):
             "is_verified": False,
             "hashed_password": hashed_password,
             "role": role,
-            "scopes": scopes
+            "scopes": scopes,
         }
 
         customer = await self.repo.create(data)
@@ -129,9 +129,7 @@ class CustomerService(BaseService):
         return await self.repo.get_by_email(email)
 
     async def get_active_customers(
-        self,
-        page: int = 1,
-        page_size: int = 100
+        self, page: int = 1, page_size: int = 100
     ) -> List[Customer]:
         """
         Get active customers with pagination.
@@ -147,10 +145,7 @@ class CustomerService(BaseService):
         return await self.repo.get_active_customers(skip=skip, limit=page_size)
 
     async def search_customers(
-        self,
-        name: str,
-        page: int = 1,
-        page_size: int = 100
+        self, name: str, page: int = 1, page_size: int = 100
     ) -> List[Customer]:
         """
         Search customers by name.
@@ -171,9 +166,7 @@ class CustomerService(BaseService):
     # ========================================================================
 
     async def update_customer(
-        self,
-        customer_id: int,
-        data: Dict[str, Any]
+        self, customer_id: int, data: Dict[str, Any]
     ) -> Optional[Customer]:
         """
         Update customer.

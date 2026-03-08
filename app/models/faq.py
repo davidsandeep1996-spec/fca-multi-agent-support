@@ -1,8 +1,10 @@
 """
 FAQ Model
 """
+
 from sqlalchemy import Column, Integer, String, Boolean, Text
 from app.database import Base
+
 
 class FAQ(Base):
     __tablename__ = "faqs"

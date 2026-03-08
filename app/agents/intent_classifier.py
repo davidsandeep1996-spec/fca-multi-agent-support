@@ -13,8 +13,6 @@ from app.agents.base import BaseAgent, AgentConfig, AgentResponse
 from app.services import ProductService
 
 
-
-
 class IntentClassifierAgent(BaseAgent):
     """
     Intent classifier agent.
@@ -41,7 +39,7 @@ class IntentClassifierAgent(BaseAgent):
                 "Is the loan guaranteed?",
                 "Tell me more about that product",
                 "What are the terms for the first option?",
-                "What are your rates for new customers?"
+                "What are your rates for new customers?",
             ],
             "routing": "product_recommender",
         },
@@ -76,9 +74,8 @@ class IntentClassifierAgent(BaseAgent):
                 "What is the daily limit?",
                 "How do I reach customer service?",
             ],
-            "routing": "general_agent", # Routes to RAG
+            "routing": "general_agent",  # Routes to RAG
         },
-
         "complaint": {
             "description": "Customer complaints or issues",
             "examples": [
@@ -90,27 +87,35 @@ class IntentClassifierAgent(BaseAgent):
                 "My card was stolen!",
                 "I need immediate help!",
                 "This is urgent!",
-                "Emergency! My card is missing!"
+                "Emergency! My card is missing!",
             ],
             "routing": "human_agent",
         },
         "general_inquiry": {
             "description": "Greetings, vague help requests, or conversation history checks.",
-            "examples": ["Hello", "Hi", "Thank you", "Who are you?", "What did I just say?"],
+            "examples": [
+                "Hello",
+                "Hi",
+                "Thank you",
+                "Who are you?",
+                "What did I just say?",
+            ],
             "routing": "general_agent",
         },
     }
 
-    def __init__(self, config: Optional[AgentConfig] = None,
-                 product_service: ProductService = None,
-    **kwargs):
+    def __init__(
+        self,
+        config: Optional[AgentConfig] = None,
+        product_service: ProductService = None,
+        **kwargs,
+    ):
         """Initialize intent classifier agent."""
         super().__init__(name="intent_classifier", config=config)
 
         # Initialize Groq client
         self.client = AsyncGroq(api_key=self.config.api_key)
         self.product_service = product_service or ProductService()
-
 
     # ========================================================================
     # ABSTRACT METHOD IMPLEMENTATIONS
@@ -133,8 +138,9 @@ class IntentClassifierAgent(BaseAgent):
             "Context-aware classification",
         ]
 
-
-    def _limit_history_context(self, context: Optional[Dict[str, Any]], max_turns: int = 2) -> List[Dict[str, str]]:
+    def _limit_history_context(
+        self, context: Optional[Dict[str, Any]], max_turns: int = 2
+    ) -> List[Dict[str, str]]:
         """Helper to limit history to prevent LLM confusion."""
         if context and "conversation_history" in context:
             history = context["conversation_history"]
@@ -216,13 +222,11 @@ class IntentClassifierAgent(BaseAgent):
         langfuse = get_client()
         langfuse.update_current_generation(
             model=self.config.model_name,
-            model_parameters={"temperature": self.config.temperature}
+            model_parameters={"temperature": self.config.temperature},
         )
         # Build prompt
         prompt = self._build_classification_prompt(message, context)
         try:
-
-
 
             async def _call_llm():
                 return await self.client.chat.completions.create(
@@ -243,10 +247,9 @@ class IntentClassifierAgent(BaseAgent):
                 usage_details={
                     "prompt_tokens": response.usage.prompt_tokens,
                     "completion_tokens": response.usage.completion_tokens,
-                    "total_tokens": response.usage.total_tokens
+                    "total_tokens": response.usage.total_tokens,
                 }
             )
-
 
             # Parse response
             result = self._parse_llm_response(response.choices[0].message.content)
@@ -255,12 +258,16 @@ class IntentClassifierAgent(BaseAgent):
         except Exception as e:
             raise e
 
-    def _build_classification_prompt(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
+    def _build_classification_prompt(
+        self, message: str, context: Optional[Dict[str, Any]] = None
+    ) -> str:
         # Intent descriptions
-        intent_descriptions = "\n".join([
-            f"- {intent}: {data['description']}"
-            for intent, data in self.INTENTS.items()
-        ])
+        intent_descriptions = "\n".join(
+            [
+                f"- {intent}: {data['description']}"
+                for intent, data in self.INTENTS.items()
+            ]
+        )
 
         prompt = f"""Classify the customer message into one of these intents:
 
@@ -270,10 +277,9 @@ class IntentClassifierAgent(BaseAgent):
         # [NEW] Inject History
         recent_history = self._limit_history_context(context, max_turns=2)
         if recent_history:
-            history_str = "\n".join([
-                f"{msg['role'].upper()}: {msg['content']}"
-                for msg in recent_history
-            ])
+            history_str = "\n".join(
+                [f"{msg['role'].upper()}: {msg['content']}" for msg in recent_history]
+            )
             prompt += f"PREVIOUS CONVERSATION:\n{history_str}\n\n"
 
         prompt += f"""CURRENT CUSTOMER MESSAGE: "{message}"
@@ -285,6 +291,7 @@ SENTIMENT: <positive|neutral|negative>
 EXPLANATION: <brief explanation>
 """
         return prompt
+
     def _get_system_prompt(self) -> str:
         """
         Get system prompt for LLM.
