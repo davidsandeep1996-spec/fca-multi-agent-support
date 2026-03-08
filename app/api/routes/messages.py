@@ -5,7 +5,7 @@ FastAPI endpoints for agent message processing.
 Handles customer messages and returns coordinated responses.
 """
 
-from fastapi import APIRouter, HTTPException, Security, Depends
+from fastapi import APIRouter, HTTPException, Security
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import logging

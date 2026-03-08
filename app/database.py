@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
 )
 from sqlalchemy.orm import declarative_base
-from sqlalchemy.pool import NullPool, QueuePool
 from sqlalchemy import  text  # Add 'text' here
 
 from typing import AsyncGenerator
@@ -94,15 +93,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 # DATABASE INITIALIZATION
 # ============================================================================
 
-async def init_db() -> None:
-    """
-    Initialize database tables.
 
-    Creates all tables defined in Base metadata.
-
-    Note: In production, use Alembic migrations instead.
-    This is for development/testing only.
-    """
 async def init_db() -> None:
     """
     Initialize database tables and extensions.

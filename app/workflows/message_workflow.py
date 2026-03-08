@@ -4,15 +4,12 @@ Message Workflow
 Multi-agent orchestration using LangGraph.
 Routes messages through Intent Classifier → Specialized Agents.
 """
-from langgraph.checkpoint.memory import MemorySaver
 from typing import Dict, Any, Optional, List
-from enum import Enum
-from pydantic import BaseModel, Field, ConfigDict
 import logging
 from app.services.security_service import SecurityService
 from langfuse import observe
 
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph
 from app.schemas.common import WorkflowState
 from app.agents.intent_classifier import IntentClassifierAgent
 from app.agents.account_agent import AccountAgent
@@ -21,14 +18,6 @@ from app.agents.human_agent import HumanAgent
 from app.agents.product_recommender import ProductRecommenderAgent
 from app.agents.compliance_checker import ComplianceCheckerAgent
 
-from app.services import (
-    AccountService,
-    CustomerService,
-    TransactionService,
-    ProductService,
-    ConversationService,
-    FAQService,
-)
 
 
 
@@ -304,7 +293,7 @@ class MessageWorkflow:
             "intent": intent,
         },context={"conversation_history": state.history})
 
-        self.logger.info(f"✅ Product recommendation generated")
+        self.logger.info("✅ Product recommendation generated")
 
         # 3. RETURN UPDATES
         return {

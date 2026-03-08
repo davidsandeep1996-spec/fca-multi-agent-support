@@ -7,7 +7,6 @@ Stores customer information and links to conversations.
 
 from sqlalchemy import Column, String, Boolean, Text, Index
 from sqlalchemy.orm import relationship
-from typing import List
 
 from app.models import BaseModel
 

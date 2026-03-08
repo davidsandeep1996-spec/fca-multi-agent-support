@@ -4,7 +4,7 @@ Message Service
 Business logic for message operations.
 """
 
-from typing import Optional, List
+from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.base import BaseService

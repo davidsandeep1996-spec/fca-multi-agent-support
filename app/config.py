@@ -8,7 +8,7 @@ Settings are loaded from environment variables with validation and type checking
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator
 from typing import Optional
-from typing import List, Literal,Optional
+from typing import List, Literal
 import json
 
 
@@ -440,13 +440,13 @@ def display_settings():
     print("APPLICATION SETTINGS")
     print("=" * 60)
 
-    print(f"\nApplication:")
+    print("\nApplication:")
     print(f"  Name: {settings.app_name}")
     print(f"  Version: {settings.app_version}")
     print(f"  Environment: {settings.environment}")
     print(f"  Debug: {settings.debug}")
 
-    print(f"\nDatabase:")
+    print("\nDatabase:")
     # Mask password in URL
     db_url = settings.database_url
     if "@" in db_url:
@@ -458,22 +458,22 @@ def display_settings():
     print(f"  Echo: {settings.database_echo}")
     print(f"  Pool Size: {settings.database_pool_size}")
 
-    print(f"\nRedis:")
+    print("\nRedis:")
     print(f"  URL: {settings.redis_url}")
     print(f"  Enabled: {settings.redis_enabled}")
 
-    print(f"\nGroq AI:")
+    print("\nGroq AI:")
     # Mask API key
     key_display = f"{settings.groq_api_key[:8]}****" if settings.groq_api_key else "NOT SET"
     print(f"  API Key: {key_display}")
     print(f"  Model: {settings.groq_model}")
     print(f"  Temperature: {settings.groq_temperature}")
 
-    print(f"\nSecurity:")
+    print("\nSecurity:")
     print(f"  Secret Key: {'SET' if settings.secret_key else 'NOT SET'}")
     print(f"  CORS Origins: {settings.cors_origins}")
 
-    print(f"\nLogging:")
+    print("\nLogging:")
     print(f"  Level: {settings.log_level}")
     print(f"  File: {settings.log_file}")
     print(f"  Format: {settings.log_format}")

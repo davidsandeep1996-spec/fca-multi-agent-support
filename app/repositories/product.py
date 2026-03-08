@@ -24,13 +24,13 @@ class ProductRepository(BaseRepository[Product]):
         result = await self.db.execute(
             select(Product)
             .where(Product.type == product_type)
-            .where(Product.is_active == True)
+            .where(Product.is_active.is_(True))
         )
         return result.scalars().all()
 
     async def get_active_products(self) -> List[Product]:
         """Get all active products."""
         result = await self.db.execute(
-            select(Product).where(Product.is_active == True)
+            select(Product).where(Product.is_active.is_(True))
         )
         return result.scalars().all()

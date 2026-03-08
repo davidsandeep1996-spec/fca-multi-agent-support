@@ -3,7 +3,7 @@ API Dependencies
 
 Reusable dependencies for dependency injection (Authentication, RBAC, Database).
 """
-from typing import Generator, Annotated
+from typing import Annotated
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, SecurityScopes
 from jose import JWTError, jwt
@@ -14,7 +14,6 @@ from app.database import get_db
 from app.config import settings
 from app.models.customer import Customer
 from app.services.customer import CustomerService
-from app.services.security_service import SecurityService
 
 # Define the Token Url (relative path)
 oauth2_scheme = OAuth2PasswordBearer(

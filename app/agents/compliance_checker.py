@@ -153,7 +153,7 @@ class ComplianceCheckerAgent(BaseAgent):
         if is_compliant:
             response_content = "✅ Content is FCA compliant"
         else:
-            response_content = f"⚠️ Compliance issues detected:\n\n"
+            response_content = "⚠️ Compliance issues detected:\n\n"
             for issue in compliance_result["issues"]:
                 response_content += f"- {issue}\n"
 

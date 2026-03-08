@@ -5,7 +5,6 @@ End-to-end testing of multi-agent system.
 Tests workflow, coordinator, and API together.
 """
 
-import asyncio
 import pytest
 from app.workflows.message_workflow import MessageWorkflow
 from app.coordinator.agent_coordinator import AgentCoordinator

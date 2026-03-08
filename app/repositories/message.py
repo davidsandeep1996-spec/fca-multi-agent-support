@@ -8,7 +8,7 @@ from typing import List
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.message import Message, MessageRole
+from app.models.message import Message
 from app.repositories.base import BaseRepository
 
 
@@ -62,7 +62,7 @@ class MessageRepository(BaseRepository[Message]):
         """
         result = await self.db.execute(
             select(Message)
-            .where(Message.requires_human == True)
+            .where(Message.requires_human.is_(True))
             .offset(skip)
             .limit(limit)
             .order_by(Message.created_at.asc())  # Oldest first

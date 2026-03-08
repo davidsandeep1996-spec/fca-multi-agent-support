@@ -53,7 +53,8 @@ class RAGService:
 
         for segment in raw_segments:
             seg = segment.strip()
-            if not seg or len(seg) < 10: continue # Skip empty/tiny chunks
+            if not seg or len(seg) < 10:
+                continue # Skip empty/tiny chunks
 
             # Reconstruct the Q&A pair
             # We prepend "Q: " so the LLM knows it's a question

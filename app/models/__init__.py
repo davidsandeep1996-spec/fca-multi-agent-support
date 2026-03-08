@@ -167,7 +167,7 @@ class BaseModel(Base, TimestampMixin):
 # - to_dict() method
 # - from_dict() class method
 
-
+# ruff: noqa: E402
 from app.models.customer import Customer
 from app.models.conversation import Conversation, ConversationStatus, ConversationChannel
 from app.models.message import Message, MessageRole

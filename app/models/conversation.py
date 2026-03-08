@@ -7,7 +7,6 @@ Links customers to messages and tracks conversation state.
 
 from sqlalchemy import Column, String, Integer, ForeignKey, Text, Enum, Index
 from sqlalchemy.orm import relationship
-from typing import List
 import enum
 
 from app.models import BaseModel

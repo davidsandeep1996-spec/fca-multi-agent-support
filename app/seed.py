@@ -6,14 +6,13 @@ Populates database with sample data for development and testing.
 
 import asyncio
 import logging
-from datetime import datetime
 from sqlalchemy import text  # <--- Added import
 
 from app.database import AsyncSessionLocal
 from app.services.customer import CustomerService
 from app.services.conversation import ConversationService
 from app.services.message import MessageService
-from app.models.conversation import ConversationChannel, ConversationStatus
+from app.models.conversation import ConversationChannel
 from app.models.message import MessageRole
 
 # Setup logging
@@ -193,7 +192,7 @@ async def seed_messages(conversation_ids: list):
             conversation_id = conversation_ids[i]
 
             for msg_data in messages:
-                message = await service.add_message(
+                await service.add_message(
                     conversation_id=conversation_id,
                     **msg_data
                 )

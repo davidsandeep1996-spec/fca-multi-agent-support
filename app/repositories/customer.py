@@ -23,7 +23,7 @@ class CustomerRepository(BaseRepository[Customer]):
     def __init__(self, db: AsyncSession):
         """Initialize customer repository."""
         super().__init__(Customer, db)
-        
+
 
     async def get_by_email(self, email: str) -> Optional[Customer]:
         """
@@ -72,7 +72,7 @@ class CustomerRepository(BaseRepository[Customer]):
         """
         result = await self.db.execute(
             select(Customer)
-            .where(Customer.is_active == True)
+            .where(Customer.is_active.is_(True))
             .offset(skip)
             .limit(limit)
             .order_by(Customer.created_at.desc())
@@ -96,8 +96,8 @@ class CustomerRepository(BaseRepository[Customer]):
         """
         result = await self.db.execute(
             select(Customer)
-            .where(Customer.is_vip == True)
-            .where(Customer.is_active == True)
+            .where(Customer.is_vip.is_(True))
+            .where(Customer.is_active.is_(True))
             .offset(skip)
             .limit(limit)
             .order_by(Customer.created_at.desc())

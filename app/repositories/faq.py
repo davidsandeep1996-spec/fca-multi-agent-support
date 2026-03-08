@@ -25,6 +25,6 @@ class FAQRepository(BaseRepository[FAQ]):
                     FAQ.category.ilike(term)
                 )
             )
-            .where(FAQ.is_active == True)
+            .where(FAQ.is_active.is_(True))
         )
         return result.scalars().all()

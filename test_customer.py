@@ -8,7 +8,6 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.customer import CustomerService
-from app.models.customer import Customer
 
 
 # ============================================================================

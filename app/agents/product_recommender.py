@@ -13,7 +13,6 @@ from langfuse import get_client
 
 import json
 from pydantic import BaseModel, Field, field_validator
-from typing import List, Dict, Any, Optional
 
 # [ENTERPRISE PATTERN 1] Define Strict Schemas for LLM Outputs
 
@@ -138,7 +137,7 @@ class ProductRecommenderAgent(BaseAgent):
 
         # 3. Build Prompt & Call LLM
         prompt = self._build_recommendation_prompt(intent, message, customer_profile, available_products, history)
-        schema_str = self._get_schema_str(RecommendationResult)
+        #schema_str = self._get_schema_str(RecommendationResult)
         sys_prompt = self._get_system_prompt() + """
 
             You MUST output a SINGLE valid JSON object.
@@ -348,9 +347,12 @@ CONFIDENCE: <0.0-1.0>
         for i, p in enumerate(products, 1):
             rate = f"{p.interest_rate}%" if p.interest_rate is not None else "Variable"
             text += f"{i}. **{p.name}**\n   {p.description}\n   Rate: {rate}\n\n"
-        if reasoning: text += f"**Why?**\n{reasoning}\n\n"
-        if key_benefits: text += f"**Benefits:**\n{key_benefits}\n\n"
-        if next_steps: text += f"**Next Steps:**\n{next_steps}\n\n"
+        if reasoning:
+            text += f"**Why?**\n{reasoning}\n\n"
+        if key_benefits:
+            text += f"**Benefits:**\n{key_benefits}\n\n"
+        if next_steps:
+            text += f"**Next Steps:**\n{next_steps}\n\n"
         return text
 
     def _get_description(self) -> str:

@@ -81,7 +81,6 @@ def generate_customers(count: int = 100, default_pwd_hash: str = None) -> list[d
 
 # app/seed_database.py
 
-from decimal import Decimal
 
 SAMPLE_PRODUCTS = [
     # --- MORTGAGES ---

@@ -10,7 +10,7 @@ from app.config import settings
 import requests
 import logging
 
-from typing import Tuple, List, Optional, Dict, Any
+from typing import Tuple, Optional, Dict, Any
 from datetime import datetime, timedelta
 from jose import jwt, JWTError # Requires python-jose
 from passlib.context import CryptContext # Requires passlib

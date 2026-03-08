@@ -342,7 +342,8 @@ CRITICAL ROUTING RULES:
             elif line.startswith("CONFIDENCE:"):
                 try:
                     confidence = float(line.split(":", 1)[1].strip())
-                except:
+                except Exception as e:
+                    self.logger.warning(f"Confidence parsing error: {e}")
                     confidence = 0.5
             elif line.startswith("SENTIMENT:"):
                 sentiment = line.split(":", 1)[1].strip().lower()

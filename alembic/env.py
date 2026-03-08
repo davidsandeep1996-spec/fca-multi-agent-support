@@ -16,7 +16,6 @@ from app.config import settings
 from app.database import Base
 
 # Import all models to ensure they're registered
-from app.models import Customer, Conversation, Message
 
 # this is the Alembic Config object
 config = context.config

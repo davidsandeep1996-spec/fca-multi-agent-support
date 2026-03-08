@@ -2,7 +2,6 @@ import asyncio
 import sys
 import os
 import logging
-import re
 
 # Ensure we can import from the 'app' folder
 sys.path.append(os.getcwd())
@@ -152,10 +151,10 @@ async def run_test():
                      break
 
             if match_found:
-                print(f"   ✅ PASS (Found in DB)")
+                print("   ✅ PASS (Found in DB)")
                 passed += 1
             else:
-                print(f"   ❌ FAIL")
+                print("   ❌ FAIL")
                 print(f"      Retrieved: '{retrieved_text[:150]}...'")
                 print(f"      Expected one of: {expected_keywords}")
                 failed += 1

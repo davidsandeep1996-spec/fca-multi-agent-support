@@ -7,7 +7,6 @@ Provides common functionality and interface.
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List, Callable
-from datetime import datetime
 import time
 import logging
 from app.schemas.common import AgentResponse
@@ -146,7 +145,7 @@ class BaseAgent(ABC):
         # 1. Circuit Breaker Check
         if not self.circuit_breaker.allow_request():
             self.logger.warning(f"Circuit Breaker OPEN for {self.name}. Failing fast.")
-            raise Exception(f"Service temporarily unavailable (Circuit Breaker Open)")
+            raise Exception("Service temporarily unavailable (Circuit Breaker Open)")
 
         try:
             # 2. Retry Logic (Tenacity)

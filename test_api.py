@@ -2,7 +2,6 @@
 Message Router API Test
 """
 
-import asyncio
 from fastapi.testclient import TestClient
 from app.main import app  # Assuming FastAPI app in app/main.py
 

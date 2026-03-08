@@ -456,7 +456,8 @@ class AgentCoordinator:
         """
         conv_context = self.get_or_create_conversation(customer_id, conversation_id)
 
-        if context is None: context = {}
+        if context is None:
+            context = {}
 
         # 1. Manage DB Session manually for the generator
         async with AsyncSessionLocal() as session:

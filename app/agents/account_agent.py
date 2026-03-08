@@ -71,7 +71,8 @@ class AccountAgent(BaseAgent):
             try:
                 # Attempt to parse ISO string
                 date_val = datetime.fromisoformat(date_val.replace('Z', '+00:00'))
-            except:
+            except Exception as e:
+                self.logger.warning(f"Date parsing error: {e}")
                 return date_val
         return date_val.strftime("%d %b %Y")
 

@@ -49,7 +49,7 @@ async def test_compliance():
             print(f"Issues: {response.metadata['issues']}")
 
         if response.metadata['required_disclaimers']:
-            print(f"Required Disclaimers:")
+            print("Required Disclaimers:")
             for disclaimer in response.metadata['required_disclaimers']:
                 print(f"  - {disclaimer}")
 

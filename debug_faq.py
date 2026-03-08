@@ -28,7 +28,7 @@ async def main():
         # Let's see exactly what is inside the first row
         result = await session.execute(select(FAQ).limit(1))
         first_faq = result.scalar()
-        print(f"\n📝 First FAQ Sample:")
+        print("\n📝 First FAQ Sample:")
         print(f"   - ID: {first_faq.id}")
         print(f"   - Question: '{first_faq.question}'")
         print(f"   - Keywords: '{first_faq.keywords}'")
@@ -52,9 +52,9 @@ async def main():
         results_full = await repo.search(query)
 
         if results_full:
-             print(f"   ✅ FOUND match!")
+             print("   ✅ FOUND match!")
         else:
-             print(f"   ❌ SEARCH FAILED for full sentence.")
+             print("   ❌ SEARCH FAILED for full sentence.")
              print("   👉 Diagnosis: The search logic (ilike) might be too strict for full sentences.")
 
 if __name__ == "__main__":

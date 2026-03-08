@@ -5,9 +5,8 @@ Protected endpoints for administrative tasks including database seeding.
 """
 
 import logging
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
-from typing import  Dict, Any, List
 from app.api.routes.messages import coordinator
 logger = logging.getLogger(__name__)
 

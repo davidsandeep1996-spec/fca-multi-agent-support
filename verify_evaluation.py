@@ -5,7 +5,6 @@ HITS THE REAL SERVER AT http://localhost:8000
 import asyncio
 import time
 from httpx import AsyncClient, Timeout
-from app.config import settings
 
 # ==============================================================================
 # 1. STANDARD GOLDEN DATASET (Regression Testing)
@@ -88,7 +87,7 @@ def print_banner(text):
 
 async def run_evaluation():
     print_banner("🔭 DIAGNOSTICS (Client Side)")
-    print(f"Target URL:    http://localhost:8000")
+    print("Target URL:    http://localhost:8000")
 
     async with AsyncClient(base_url="http://localhost:8000", timeout=Timeout(60.0)) as client:
 

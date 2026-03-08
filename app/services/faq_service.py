@@ -1,7 +1,7 @@
 """
 FAQ Service
 """
-from typing import List, Optional
+from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.base import BaseService
 from app.repositories.faq import FAQRepository

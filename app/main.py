@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 import logging
-from fastapi import UploadFile, File, BackgroundTasks, HTTPException
+from fastapi import UploadFile, File, HTTPException
 
 from prometheus_fastapi_instrumentator import Instrumentator
 import shutil
@@ -32,7 +32,6 @@ from app.routers.admin import router as admin_router
 
 from app.api.routes.auth import router as auth_router
 
-from prometheus_fastapi_instrumentator import Instrumentator
 
 # Import routers
 from app.routers import health
