@@ -29,7 +29,7 @@ jobs:
     # Service containers for database
     services:
       postgres:
-        image: postgres:15-alpine
+        image: pgvector/pgvector:pg15
         env:
           POSTGRES_USER: test_user
           POSTGRES_PASSWORD: test_password
@@ -113,7 +113,7 @@ jobs:
           SECRET_KEY: super-secret-test-key-that-is-at-least-32-chars
           ENVIRONMENT: test
         run: |
-          pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=xml
+          pytest tests/ -v --tb=short --disable-warnings --cov=app --cov-report=term-missing --cov-report=xml
 
   # ============================================================================
   # BUILD JOB

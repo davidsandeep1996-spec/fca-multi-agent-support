@@ -15,7 +15,7 @@ from sqlalchemy import text  # Add 'text' here
 
 from typing import AsyncGenerator
 import logging
-
+from sqlalchemy.pool import NullPool
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -24,16 +24,35 @@ logger = logging.getLogger(__name__)
 # DATABASE ENGINE
 # ============================================================================
 
-# Create async engine
-engine = create_async_engine(
-    settings.database_url,
-    echo=settings.database_echo,  # Log SQL queries (debugging)
-    future=True,  # Use SQLAlchemy 2.0 style
-    pool_size=settings.database_pool_size,  # Connection pool size
-    max_overflow=settings.database_max_overflow,  # Max connections above pool_size
-    pool_pre_ping=True,  # Verify connections before using
-    pool_recycle=3600,  # Recycle connections after 1 hour
-)
+# Define base engine arguments
+engine_kwargs = {
+    "echo": settings.database_echo,
+    "future": True,  # Ensures SQLAlchemy 2.0 standards
+}
+
+# Apply environment-specific configurations
+if settings.environment == "test":
+    # CRITICAL: Use NullPool in testing to prevent background tasks
+    # from outliving the Pytest event loop.
+    engine_kwargs.update(
+        {
+            "poolclass": NullPool,
+            "echo": False,  # Prevent log flooding during high-volume AI tests
+        }
+    )
+else:
+    # Production/Development pooling configuration
+    engine_kwargs.update(
+        {
+            "pool_size": settings.database_pool_size,
+            "max_overflow": settings.database_max_overflow,
+            "pool_recycle": 3600,
+            "pool_pre_ping": True,  # Automatically reconnects dropped DB links
+        }
+    )
+
+# Create the async engine dynamically
+engine = create_async_engine(settings.database_url, **engine_kwargs)
 
 
 # ============================================================================
