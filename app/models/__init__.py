@@ -181,6 +181,7 @@ from app.models.message import Message, MessageRole
 from app.models.product import Product
 from app.models.account import Account, AccountType, AccountStatus
 from app.models.transaction import Transaction
+from app.services.rag_service import DocumentChunk
 
 __all__ = [
     "Base",
@@ -198,4 +199,5 @@ __all__ = [
     "AccountType",
     "AccountStatus",
     "Transaction",
+    "DocumentChunk",
 ]

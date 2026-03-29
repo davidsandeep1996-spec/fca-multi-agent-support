@@ -101,9 +101,7 @@ jobs:
           python -c "
           import asyncio
           # MUST import models so Base.metadata registers them!
-          import app.models.conversation
-          import app.models.message
-          # Add any other model files here if they exist (e.g., customer, account)
+          import app.models
           from app.database import init_db
 
           async def setup():
