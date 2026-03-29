@@ -1,10 +1,26 @@
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Literal
 from datetime import datetime
 from groq import AsyncGroq
 from langfuse import observe
+from pydantic import BaseModel, Field
+import json
+
 from app.agents.base import BaseAgent, AgentConfig, AgentResponse
 from app.services import AccountService, CustomerService, TransactionService
 
+# ============================================================================
+# ENTERPRISE SCHEMAS
+# ============================================================================
+
+class AccountQueryAnalysis(BaseModel):
+    """Strict schema for determining what the user wants to know about their account."""
+    query_type: Literal["balance", "transactions", "statement", "details", "general"] = Field(
+        description="The exact type of account query the user is making."
+    )
+
+# ============================================================================
+# ACCOUNT AGENT
+# ============================================================================
 
 class AccountAgent(BaseAgent):
     def __init__(
@@ -18,13 +34,9 @@ class AccountAgent(BaseAgent):
         super().__init__(name="account_agent", config=config)
         self.client = AsyncGroq(api_key=self.config.api_key)
 
-        if (
-            account_service is None
-            or customer_service is None
-            or transaction_service is None
-        ):
+        if not all([account_service, customer_service, transaction_service]):
             raise ValueError(
-                "AccountAgent requires DB-backed services (inject AccountService/CustomerService/TransactionService)."
+                "AccountAgent requires DB-backed services."
             )
 
         self.account_service = account_service
@@ -32,95 +44,67 @@ class AccountAgent(BaseAgent):
         self.transaction_service = transaction_service
 
     def _get_description(self) -> str:
-        return (
-            "Account Agent - Handles customer account inquiries including "
-            "balance checks, transaction history, account statements, and operations."
-        )
+        return "Account Agent - Handles customer account balances, transactions, and statements."
 
     def _get_capabilities(self) -> List[str]:
-        return [
-            "Account balance retrieval",
-            "Transaction history lookup",
-            "Account statement generation",
-            "Account detail queries",
-            "Natural language account information",
-        ]
-
-    def _extract_clean_message(self, message: str) -> str:
-        """Helper to strip history context from message for accurate intent matching."""
-        clean = message.lower()
-        if "current user message:" in clean:
-            clean = clean.split("current user message:")[-1]
-        return clean.strip()
+        return ["Balance retrieval", "Transaction history", "Account statements", "Account details"]
 
     def _format_currency(self, amount: float) -> str:
-        """Format number as GBP currency (e.g., £2,500.00)."""
         return f"£{amount:,.2f}"
 
     def _friendly_account_type(self, acct_type: Any) -> str:
-        """Map database Enum values to professional banking names."""
-        # Convert Enum or string to lowercase string key
         key = str(acct_type).lower().split(".")[-1] if acct_type else ""
-
         mapping = {
             "current": "Standard Current Account",
             "savings": "High-Yield Savings",
             "loan": "Personal Loan",
             "credit": "Platinum Credit Card",
-            "active": "Active",
-            "frozen": "Frozen",
-            "closed": "Closed",
         }
         return mapping.get(key, "General Account")
 
     def _friendly_date(self, date_val: Any) -> str:
-        """Format dates nicely (e.g., '14 Feb 2026')."""
         if not date_val:
             return "N/A"
         if isinstance(date_val, str):
             try:
-                # Attempt to parse ISO string
                 date_val = datetime.fromisoformat(date_val.replace("Z", "+00:00"))
-            except Exception as e:
-                self.logger.warning(f"Date parsing error: {e}")
+            except Exception:
                 return date_val
         return date_val.strftime("%d %b %Y")
 
     @observe(name="AccountAgent")
-    async def process(
-        self,
-        input_data: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None,
-    ) -> AgentResponse:
+    async def process(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentResponse:
         self.log_request(input_data)
 
         try:
             await self.validate_input(input_data)
-
             customer_id = input_data.get("customer_id")
             message = input_data.get("message", "")
+
             if not customer_id:
-                raise ValueError("customer_id is required")
+                raise ValueError("Unauthorized: customer_id is required.")
 
-            query_type = self._determine_query_type(message)
+            # 1. AI Intent Extraction
+            query_type = await self._determine_query_type(message)
 
-            async with self.customer_service as cust_svc:
-                async with self.account_service as acct_svc:
-                    async with self.transaction_service as txn_svc:
-                        result = await self._fetch_real_data(
-                            cust_svc,
-                            acct_svc,
-                            txn_svc,
-                            customer_id,
-                            query_type,
-                            message,
-                        )
+            # 2. Fetch Raw Database Data
+            async with self.customer_service as cust_svc, \
+                       self.account_service as acct_svc, \
+                       self.transaction_service as txn_svc:
+
+                raw_data = await self._fetch_real_data(
+                    cust_svc, acct_svc, txn_svc, str(customer_id), query_type
+                )
+
+            # 3. AI Conversational Generation
+            conversational_response = await self._generate_conversational_response(message, raw_data)
+
             response = self.create_response(
-                content=result["response"],
+                content=conversational_response,
                 metadata={
                     "query_type": query_type,
-                    "account_data": result.get("data"),
-                    "data_points": result.get("data_points", []),
+                    "account_data": raw_data.get("data"),
+                    "data_points": raw_data.get("data_points", []),
                 },
                 confidence=0.95,
             )
@@ -130,289 +114,135 @@ class AccountAgent(BaseAgent):
         except Exception as e:
             self.logger.error(f"Account query error: {e}")
             return self.create_response(
-                content=f"I couldn't retrieve your account information. Error: {str(e)}",
-                metadata={"error": str(e)},
+                content="I apologize, but I am currently experiencing technical difficulties retrieving your account information. Please try again later.",
+                metadata={"error": "internal_system_error"},
                 confidence=0.0,
             )
 
-    def _determine_query_type(self, message: str) -> str:
+    async def _determine_query_type(self, message: str) -> str:
+        """Uses LLM structured output with Zero-Shot formatting to flawlessly identify user intent."""
+        prompt = f"""
+        Analyze the following user banking query: "{message}"
 
-        message_lower = self._extract_clean_message(message)
+        Determine if they are asking for:
+        - "balance" (how much money they have)
+        - "transactions" (recent activity, history, purchases)
+        - "statement" (official document, PDF request)
+        - "details" (account number, status, open date)
+        - "general" (rules, policies, or general greetings)
 
-        # These words imply the user wants to know a RULE, not a NUMBER.
-        policy_triggers = [
-            "can i",
-            "may i",
-            "allowed to",
-            "rules",
-            "policy",
-            "limit",
-            "fee",
-            "charge",
-            "penalty",
-            "interest rate",
-            "terms",
-            "overpay",
-            "close",
-            "open",
-            "switch",
-            "transfer limit",
-            "how do i",
-            "procedure",
-        ]
+        You must respond with a single valid JSON object. Do NOT wrap it in a list or array.
+        It must contain exactly one key: "query_type".
 
-        # If it contains a policy trigger, kick it to 'general' (RAG)
-        # UNLESS it is a direct data request like "What is my overdraft limit?"
-        if any(trigger in message_lower for trigger in policy_triggers):
-            # Exception: Keep it if they explicitly ask for their specific balance/limit value
-            if "balance" not in message_lower and "available" not in message_lower:
-                return "general"
-
-        if any(
-            word in message_lower
-            for word in ["balance", "how much", "account total", "have"]
-        ):
-            return "balance"
-        elif any(
-            word in message_lower
-            for word in ["transaction", "history", "recent", "activity"]
-        ):
-            return "transactions"
-        elif any(
-            word in message_lower for word in ["statement", "download", "pdf", "email"]
-        ):
-            return "statement"
-        elif any(
-            word in message_lower for word in ["details", "information", "account info"]
-        ):
-            return "details"
-        else:
-            return "general"
-
-    async def _fetch_real_data(
-        self,
-        cust_svc,
-        acct_svc,
-        txn_svc,
-        customer_id: int,
-        query_type: str,
-        message: str,
-    ) -> Dict[str, Any]:
-        """
-        Fetch real data from database services.
+        Example Output:
+        {{
+            "query_type": "balance"
+        }}
         """
         try:
-            # 1) Customer lookup uses INTERNAL PK (customers.id: int)
-            customer = await cust_svc.get_customer(customer_id)
-            if not customer:
-                return {
-                    "response": f"Customer {customer_id} not found",
-                    "data": {},
-                    "data_points": [],
-                }
-
-            # 2) Accounts lookup uses EXTERNAL customer id (accounts.customer_id: varchar)
-            external_customer_id = getattr(customer, "customer_id", None)
-            if not external_customer_id:
-                return {
-                    "response": f"Customer {customer_id} is missing external customer_id",
-                    "data": {},
-                    "data_points": [],
-                }
-
-            # Helper: safely pull account fields that differ by schema
-            def _account_summary(acct):
-                return {
-                    "account_number": getattr(acct, "account_number", None),
-                    "type": getattr(
-                        acct, "type", None
-                    ),  # <-- real column name is `type`
-                    "status": getattr(acct, "status", None),
-                    "balance": float(getattr(acct, "balance", 0.0) or 0.0),
-                    "created_at": getattr(acct, "created_at", None),
-                }
-
-            if query_type == "balance":
-                accounts = await acct_svc.get_accounts_by_customer(external_customer_id)
-                if not accounts:
-                    response = (
-                        "Your current account balance is 0.00.\n\n"
-                        "Account: N/A\n"
-                        "Account Type: N/A\n"
-                        f"Last Updated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}"
-                    )
-                    return {
-                        "response": response,
-                        "data": {"balance": 0.0, "account_number": None, "type": None},
-                        "data_points": ["balance", "account_number", "type"],
-                    }
-
-                acct = accounts[0]
-                acct_num = getattr(acct, "account_number", None)
-                acct_type = getattr(acct, "type", None)
-                balance = float(getattr(acct, "balance", 0.0) or 0.0)
-
-                friendly_type = self._friendly_account_type(acct_type)
-                formatted_bal = self._format_currency(balance)
-
-                response = (
-                    f"Your **{friendly_type}** balance is **{formatted_bal}**.\n\n"
-                    f"**Account Details:**\n"
-                    f"• Number: `{acct_num}`\n"
-                    f"• Status: Active"
-                )
-
-                return {
-                    "response": response,
-                    "data": {
-                        "balance": balance,
-                        "account_number": acct_num,
-                        "type": acct_type,
-                    },
-                    "data_points": ["balance", "account_number", "type"],
-                }
-
-            elif query_type == "transactions":
-                accounts = await acct_svc.get_accounts_by_customer(external_customer_id)
-                if not accounts:
-                    return {
-                        "response": f"No accounts found for customer {customer_id}",
-                        "data": {},
-                        "data_points": [],
-                    }
-
-                acct = accounts[0]
-                account_id = getattr(acct, "id", None)
-                if account_id is None:
-                    return {
-                        "response": "Account record missing id",
-                        "data": {},
-                        "data_points": [],
-                    }
-
-                # Note: this service actually expects account_id (despite method name) in your codebase
-                all_transactions = await txn_svc.get_transactions_by_account(
-                    account_id, limit=10
-                )
-                transactions = all_transactions[:5]
-
-                response = "Here are your 5 most recent transactions:\n\n"
-                for i, txn in enumerate(transactions, 1):
-                    desc = getattr(txn, "description", "Transaction")
-                    amt = float(getattr(txn, "amount", 0.0) or 0.0)
-                    date_obj = getattr(txn, "date", None) or getattr(
-                        txn, "transaction_date", None
-                    )
-
-                    date_str = self._friendly_date(date_obj)
-                    formatted_amt = self._format_currency(amt)
-
-                    # Format: 1. Starbucks (14 Feb) ... £4.50
-                    response += f"{i}. **{desc}**\n   {date_str} • {formatted_amt}\n"
-
-                return {
-                    "response": response,
-                    "data": {
-                        "account": _account_summary(acct),
-                        "transactions": [
-                            {
-                                "description": getattr(t, "description", None),
-                                "amount": getattr(t, "amount", None),
-                                "date": getattr(t, "transaction_date", None),
-                            }
-                            for t in transactions
-                        ],
-                    },
-                    "data_points": ["transactions", "dates", "amounts"],
-                }
-
-            elif query_type == "statement":
-                accounts = await acct_svc.get_accounts_by_customer(external_customer_id)
-                acct = accounts[0] if accounts else None
-                account_number = getattr(acct, "account_number", None) if acct else None
-
-                response = (
-                    f"Statement Request for Account {account_number or 'N/A'}\n\n"
-                    "Your account statement has been generated.\n"
-                    f"A PDF will be emailed to {getattr(customer, 'email', 'your email')} shortly.\n\n"
-                    "You can also download it from your online banking portal:\n"
-                    "- Log in to your account\n"
-                    "- Go to Documents > Statements\n"
-                    "- Select the date range\n"
-                    "- Click Download PDF\n\n"
-                    "If you need help, contact us at support@bank.com"
-                )
-
-                return {
-                    "response": response,
-                    "data": {
-                        "account_number": account_number,
-                        "email": getattr(customer, "email", None),
-                    },
-                    "data_points": ["statement_generated", "email", "account_number"],
-                }
-
-            elif query_type == "details":
-                accounts = await acct_svc.get_accounts_by_customer(external_customer_id)
-                if not accounts:
-                    return {
-                        "response": f"No accounts found for customer {customer_id}",
-                        "data": {},
-                        "data_points": [],
-                    }
-
-                acct = accounts[0]
-                acct_num = getattr(acct, "account_number", None)
-                acct_type = getattr(acct, "type", None)
-                created_at = getattr(
-                    acct, "created_at", None
-                )  # prefer created_at over created_date
-
-                friendly_type = self._friendly_account_type(acct_type)
-                formatted_bal = self._format_currency(
-                    float(getattr(acct, "balance", 0.0))
-                )
-                status = self._friendly_account_type(getattr(acct, "status", "Active"))
-                open_date = self._friendly_date(created_at)
-
-                response = (
-                    f"Here is the summary for your **{friendly_type}**:\n\n"
-                    f"• **Account Number:** `{acct_num}`\n"
-                    f"• **Available Balance:** {formatted_bal}\n"
-                    f"• **Status:** {status}\n"
-                    f"• **Opened On:** {open_date}\n"
-                )
-                return {
-                    "response": response,
-                    "data": {
-                        "account_number": acct_num,
-                        "type": acct_type,
-                        "balance": float(getattr(acct, "balance", 0.0) or 0.0),
-                        "status": getattr(acct, "status", None),
-                        "created_at": created_at,
-                    },
-                    "data_points": [
-                        "account_number",
-                        "type",
-                        "balance",
-                        "status",
-                        "created_at",
-                    ],
-                }
-
-            else:
-                accounts = await acct_svc.get_accounts_by_customer(external_customer_id)
-                response = f"Account information for customer {customer_id}. How else can I help with your account?"
-                return {
-                    "response": response,
-                    "data": {"account_count": len(accounts) if accounts else 0},
-                    "data_points": ["account_info"],
-                }
+            response = await self.client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                response_format={"type": "json_object"}
+            )
+            # We still use Pydantic to strictly validate the output!
+            analysis = AccountQueryAnalysis.model_validate_json(response.choices[0].message.content)
+            return analysis.query_type
 
         except Exception as e:
-            self.logger.error(f"Error fetching real data: {e}")
+            self.logger.error(f"LLM Intent Error: {e}")
+            return "general"
+
+    async def _generate_conversational_response(self, user_message: str, raw_data: Dict[str, Any]) -> str:
+        """Feeds raw DB JSON to the LLM to generate a natural, helpful response."""
+        if raw_data.get("error"):
+            return "I'm sorry, I couldn't locate your active account details at this moment."
+
+        prompt = f"""
+        You are a highly professional banking AI assistant.
+        The user asked: "{user_message}"
+
+        Here is the securely retrieved raw data from their bank account:
+        {json.dumps(raw_data.get('data', {}), indent=2)}
+
+        Task:
+        Formulate a polite, clear, and professional response to the user answering their question using ONLY this data.
+        Ensure numbers look like currency where appropriate. Do not hallucinate any data not present in the JSON.
+        """
+        try:
+            response = await self.client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[{"role": "system", "content": prompt}],
+                temperature=0.3
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            self.logger.error(f"LLM Generation Error: {e}")
+            return "I have retrieved your data, but experienced an issue formatting it. Please check your online portal."
+
+    async def _fetch_real_data(
+        self, cust_svc, acct_svc, txn_svc, customer_id: str, query_type: str
+    ) -> Dict[str, Any]:
+        """Strictly fetches data using specific repository lookups."""
+
+        # FIX: Use the repository to search by the string 'CUST-000001'
+        customer = await cust_svc.repo.get_by_customer_id(customer_id)
+        if not customer:
+            return {"error": "customer_not_found"}
+
+        accounts = await acct_svc.get_accounts_by_customer(customer_id)
+        if not accounts:
+            return {"error": "no_accounts_found"}
+
+        acct = accounts[0]
+
+        if query_type == "balance":
             return {
-                "response": f"Error retrieving account information: {str(e)}",
-                "data": {},
-                "data_points": [],
+                "data": {
+                    "account_number": getattr(acct, "account_number", "N/A"),
+                    "account_type": self._friendly_account_type(getattr(acct, "type", None)),
+                    "balance": self._format_currency(float(getattr(acct, "balance", 0.0))),
+                    "status": "Active"
+                },
+                "data_points": ["balance"]
             }
+
+        elif query_type == "transactions":
+            # FIX: We need the internal integer 'id' for transactions
+            account_id = getattr(acct, "id", None)
+            all_transactions = await txn_svc.get_transactions_by_account(account_id, limit=5)
+
+            txns = [{
+                "description": getattr(t, "description", "Unknown"),
+                "amount": self._format_currency(float(getattr(t, "amount", 0.0))),
+                "date": self._friendly_date(getattr(t, "date", None) or getattr(t, "transaction_date", None))
+            } for t in all_transactions]
+
+            return {
+                "data": {"recent_transactions": txns},
+                "data_points": ["transactions"]
+            }
+
+        elif query_type == "details":
+            return {
+                "data": {
+                    "account_number": getattr(acct, "account_number", "N/A"),
+                    "account_type": self._friendly_account_type(getattr(acct, "type", None)),
+                    "opened_on": self._friendly_date(getattr(acct, "created_at", None)),
+                    "status": "Active"
+                },
+                "data_points": ["details"]
+            }
+
+        elif query_type == "statement":
+            return {
+                "data": {
+                    "account_number": getattr(acct, "account_number", "N/A"),
+                    "email": getattr(customer, "email", "your registered email"),
+                    "statement_status": "Generated and sent"
+                },
+                "data_points": ["statement_generated"]
+            }
+
+        return {"data": {"note": "Account verified. Awaiting specific inquiry."}}

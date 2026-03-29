@@ -127,3 +127,27 @@ ipython_config.py
 20260114_add_priority_to_conversations.py
 
 full_project_context_updated.txt
+
+
+test_api.py
+test_compliance.py
+test_coordinator.py
+test_customer.py
+test_db_smoke.py
+test_doc.txt
+test_general_agent.py
+test_health.py
+test_human_agent.py
+test_integration.py
+test_intent.py
+test_product_recommender.py
+test_rag.py
+test_results.log
+test_workflow.py
+verify_evaluation.py
+verify_productagent.py
+debug_faq.py
+app/verify_conversation_api.py
+app/verify_full_workflow.py
+app/verify_hitl.py
+app/verify_memory.py

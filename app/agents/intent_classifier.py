@@ -1,36 +1,59 @@
 """
-Intent Classifier Agent
+Intent Classifier Agent (Enterprise Grade)
 
 Classifies customer intent from messages to route to appropriate specialists.
+Uses Google-style "Few-Shot" training phrases and Strict Pydantic JSON validation.
 """
 
-from typing import Dict, Any, Optional, List
+import json
+from typing import Dict, Any, Optional, List, Literal
+from pydantic import BaseModel, Field
 from groq import AsyncGroq
-from langfuse import observe
-from langfuse import get_client
+from langfuse import observe, get_client
 
 from app.agents.base import BaseAgent, AgentConfig, AgentResponse
 from app.services import ProductService
 
+# ============================================================================
+# ENTERPRISE SCHEMAS
+# ============================================================================
+
+class IntentClassification(BaseModel):
+    """Strict schema for intent classification and routing."""
+    intent: Literal[
+        "product_acquisition",
+        "account_data",
+        "knowledge_inquiry",
+        "complaint",
+        "general_inquiry"
+    ] = Field(description="The classified intent of the user's message.")
+
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence score from 0.0 to 1.0.")
+
+    sentiment: Literal["positive", "neutral", "negative"] = Field(description="The emotional sentiment of the message.")
+
+    explanation: str = Field(description="A brief, 1-sentence explanation of why this intent was chosen.")
+
+# ============================================================================
+# INTENT CLASSIFIER AGENT
+# ============================================================================
 
 class IntentClassifierAgent(BaseAgent):
     """
     Intent classifier agent.
-
     Analyzes customer messages to determine intent and route appropriately.
     """
 
     # ========================================================================
-    # INTENT CATEGORIES
+    # INTENT CATEGORIES 
     # ========================================================================
 
     INTENTS = {
         "product_acquisition": {
-            "description": """Customer wants RECOMMENDATIONS, wants to APPLY, or is asking for DETAILS/OPTIONS/TERMS/PENALTIES about a specific product (loans, bonds, cards, accounts, savings for a goal). \n
+            "description": """Customer wants RECOMMENDATIONS, wants to APPLY, or is asking for DETAILS/OPTIONS/TERMS about a specific product (loans, bonds, cards, accounts, savings for a goal). \n
             CRITICAL RULE: You MUST choose this intent if the user mentions a SPECIFIC product by name (e.g., 'Fixed Rate Bond', 'Mortgage', 'Credit Card') and asks about its rules, penalties, early withdrawals, terms, or features. This handles both sales AND specific product policy questions.""",
             "examples": [
                 "I want to apply for a mortgage",
-                "What happens if I withdraw my money early? Are there penalties?",
                 "What are your loan interest rates?",
                 "What is the best account to put my emergency fund into?",
                 "I am traveling next month and need a plastic card",
@@ -56,10 +79,11 @@ class IntentClassifierAgent(BaseAgent):
             "routing": "account_agent",
         },
         "knowledge_inquiry": {
-            "description": "Questions about POLICIES, RULES, FEES, LIMITS, or 'HOW TO'. General banking knowledge.",
+            "description": "Questions about POLICIES, RULES, FEES, LIMITS, PENALTIES or 'HOW TO'. General banking knowledge.",
             "examples": [
                 "Can I overpay my mortgage?",
                 "What is the fee for CHAPS?",
+                "What happens if I withdraw my money early? Are there penalties?",
                 "How do I close my account?",
                 "Is Open Banking safe?",
                 "What are the rules for overdrafts?",
@@ -74,7 +98,7 @@ class IntentClassifierAgent(BaseAgent):
                 "What is the daily limit?",
                 "How do I reach customer service?",
             ],
-            "routing": "general_agent",  # Routes to RAG
+            "routing": "general_agent",
         },
         "complaint": {
             "description": "Customer complaints or issues",
@@ -110,26 +134,14 @@ class IntentClassifierAgent(BaseAgent):
         product_service: ProductService = None,
         **kwargs,
     ):
-        """Initialize intent classifier agent."""
         super().__init__(name="intent_classifier", config=config)
-
-        # Initialize Groq client
         self.client = AsyncGroq(api_key=self.config.api_key)
         self.product_service = product_service or ProductService()
 
-    # ========================================================================
-    # ABSTRACT METHOD IMPLEMENTATIONS
-    # ========================================================================
-
     def _get_description(self) -> str:
-        """Get agent description."""
-        return (
-            "Intent Classifier Agent - Analyzes customer messages to determine "
-            "intent and route to appropriate specialist agents."
-        )
+        return "Intent Classifier Agent - Analyzes customer messages to determine intent and route to appropriate specialist agents."
 
     def _get_capabilities(self) -> List[str]:
-        """Get agent capabilities."""
         return [
             "Intent classification",
             "Sentiment analysis",
@@ -138,257 +150,166 @@ class IntentClassifierAgent(BaseAgent):
             "Context-aware classification",
         ]
 
-    def _limit_history_context(
-        self, context: Optional[Dict[str, Any]], max_turns: int = 2
-    ) -> List[Dict[str, str]]:
-        """Helper to limit history to prevent LLM confusion."""
+    def _limit_history_context(self, context: Optional[Dict[str, Any]], max_turns: int = 2) -> List[Dict[str, str]]:
         if context and "conversation_history" in context:
             history = context["conversation_history"]
             if history:
                 return history[-max_turns:]
         return []
 
-    # ========================================================================
-    # CORE PROCESSING
-    # ========================================================================
     @observe(name="IntentClassifier")
-    async def process(
-        self,
-        input_data: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None,
-    ) -> AgentResponse:
-        """
-        Classify intent from customer message.
-
-        Args:
-            input_data: Must contain 'message' key
-            context: Optional conversation context
-
-        Returns:
-            AgentResponse: Classification result
-        """
-        # Validate input
-        await self.validate_input(input_data)
-
-        # Log request
+    async def process(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentResponse:
         self.log_request(input_data)
 
-        # Extract message
-        message = input_data.get("message", "")
-        if not message:
-            raise ValueError("Message is required")
+        try:
+            await self.validate_input(input_data)
+            message = input_data.get("message", "")
 
-        # Classify intent
-        classification = await self._classify_intent(message, context)
+            if not message:
+                raise ValueError("Message is required")
 
-        # Create response
-        response = self.create_response(
-            content=classification["intent"],
-            metadata={
-                "intent": classification["intent"],
-                "sentiment": classification["sentiment"],
-                "routing": classification["routing"],
-                "explanation": classification["explanation"],
-            },
-            confidence=classification["confidence"],
-        )
+            classification = await self._classify_intent(message, context)
 
-        # Log response
-        self.log_response(response)
+            response = self.create_response(
+                content=classification["intent"],
+                metadata={
+                    "intent": classification["intent"],
+                    "sentiment": classification["sentiment"],
+                    "routing": classification["routing"],
+                    "explanation": classification["explanation"],
+                },
+                confidence=classification["confidence"],
+            )
+            self.log_response(response)
+            return response
 
-        return response
+        except Exception as e:
+            self.logger.error(f"Intent Classification error: {e}")
+            # ENTERPRISE FIX: Safe Degradation. If the LLM fails, route to General Agent safely.
+            return self.create_response(
+                content="general_inquiry",
+                metadata={
+                    "intent": "general_inquiry",
+                    "sentiment": "neutral",
+                    "routing": "general_agent",
+                    "explanation": "System fallback due to technical error.",
+                    "error": str(e)
+                },
+                confidence=0.0,
+            )
 
-    # ========================================================================
-    # CLASSIFICATION LOGIC
-    # ========================================================================
-    # Decorate the classification logic as a generation
     @observe(as_type="generation", name="Groq-Intent-Classification")
-    async def _classify_intent(
-        self,
-        message: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """
-        Classify intent using LLM.
+    async def _classify_intent(self, message: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 
-        Args:
-            message: Customer message
-            context: Optional context
-
-        Returns:
-            dict: Classification result
-        """
-        # Initialize Langfuse client for updates
         langfuse = get_client()
         langfuse.update_current_generation(
             model=self.config.model_name,
-            model_parameters={"temperature": self.config.temperature},
+            model_parameters={"temperature": 0.0}, # Keep temp 0 for deterministic routing
         )
-        # Build prompt
-        prompt = self._build_classification_prompt(message, context)
-        try:
 
+        prompt = self._build_classification_prompt(message, context)
+
+        try:
             async def _call_llm():
                 return await self.client.chat.completions.create(
-                    model=self.config.model_name,
+                    model="llama-3.1-8b-instant",
                     messages=[
                         {"role": "system", "content": self._get_system_prompt()},
                         {"role": "user", "content": prompt},
                     ],
-                    temperature=self.config.temperature,
-                    max_tokens=self.config.max_tokens,
+                    temperature=0.0,
+                    response_format={"type": "json_object"}
                 )
 
-            # Execute with stability logic
             response = await self.execute_with_retry(_call_llm)
 
-            # Update Usage
-            langfuse.update_current_generation(
-                usage_details={
-                    "prompt_tokens": response.usage.prompt_tokens,
-                    "completion_tokens": response.usage.completion_tokens,
-                    "total_tokens": response.usage.total_tokens,
-                }
-            )
+            if hasattr(response, 'usage') and response.usage:
+                langfuse.update_current_generation(
+                    usage_details={
+                        "prompt_tokens": response.usage.prompt_tokens,
+                        "completion_tokens": response.usage.completion_tokens,
+                        "total_tokens": response.usage.total_tokens,
+                    }
+                )
 
-            # Parse response
-            result = self._parse_llm_response(response.choices[0].message.content)
+            parsed_data = IntentClassification.model_validate_json(response.choices[0].message.content)
+            routing = self.INTENTS.get(parsed_data.intent, {}).get("routing", "general_agent")
 
-            return result
+            return {
+                "intent": parsed_data.intent,
+                "confidence": parsed_data.confidence,
+                "sentiment": parsed_data.sentiment,
+                "explanation": parsed_data.explanation,
+                "routing": routing,
+            }
+
         except Exception as e:
+            self.logger.error(f"LLM parsing failed: {e}")
             raise e
 
-    def _build_classification_prompt(
-        self, message: str, context: Optional[Dict[str, Any]] = None
-    ) -> str:
-        # Intent descriptions
-        intent_descriptions = "\n".join(
-            [
-                f"- {intent}: {data['description']}"
-                for intent, data in self.INTENTS.items()
-            ]
-        )
+    def _build_classification_prompt(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
+        # ENTERPRISE FIX: Inject the Training Phrases (Examples) into the prompt like Dialogflow!
+        intent_blocks = []
+        for intent, data in self.INTENTS.items():
+            # Pass up to 5 examples to the LLM to teach it the exact pattern
+            examples_str = "\n    - ".join(data.get("examples", [])[:5])
+            block = f"- **{intent}**\n  Description: {data['description']}\n  Examples:\n    - {examples_str}"
+            intent_blocks.append(block)
 
-        prompt = f"""Classify the customer message into one of these intents:
+        intent_descriptions = "\n\n".join(intent_blocks)
+        schema_json = json.dumps(IntentClassification.model_json_schema(), indent=2)
+
+        prompt = f"""Classify the customer message into one of these exact intents. Study the examples carefully:
 
 {intent_descriptions}
 
 """
-        # [NEW] Inject History
         recent_history = self._limit_history_context(context, max_turns=2)
         if recent_history:
-            history_str = "\n".join(
-                [f"{msg['role'].upper()}: {msg['content']}" for msg in recent_history]
-            )
-            prompt += f"PREVIOUS CONVERSATION:\n{history_str}\n\n"
+            history_str = "\n".join([f"{msg.get('role', 'user').upper()}: {msg.get('content', '')}" for msg in recent_history])
+            prompt += f"PREVIOUS CONVERSATION HISTORY:\n{history_str}\n\n"
 
         prompt += f"""CURRENT CUSTOMER MESSAGE: "{message}"
 
-Respond in this exact format:
-INTENT: <intent_name>
-CONFIDENCE: <0.0-1.0>
-SENTIMENT: <positive|neutral|negative>
-EXPLANATION: <brief explanation>
+You MUST respond with a single valid JSON object exactly matching this schema:
+{schema_json}
+
+Example Output:
+{{
+    "intent": "account_data",
+    "confidence": 0.95,
+    "sentiment": "neutral",
+    "explanation": "The user is asking for their specific account balance."
+}}
 """
         return prompt
 
     def _get_system_prompt(self) -> str:
-        """
-        Get system prompt for LLM.
-
-        Returns:
-            str: System prompt
-        """
-        return """You are an expert intent classifier for a UK financial services company (FCA regulated).
+        return """You are an expert intent classifier for a UK financial services company.
 
 Your job is to analyze customer messages and determine their intent accurately.
 
 Guidelines:
-- Be precise and confident in your classifications
-- Consider context from conversation history
-- Detect sentiment (positive, neutral, negative)
-- Provide clear explanations
-- Use the exact format requested
-- SPECIAL RULE: If a user asks about their *past* conversation (e.g., "What did I just say?"), classify as 'general_inquiry', NOT the topic they are asking about.
+- Consider context from conversation history.
+- SPECIAL RULE: If a user asks about their *past* conversation (e.g., "What did I just say?"), classify as 'general_inquiry'.
 
 CRITICAL ROUTING RULES:
 1. **account_data**: ONLY select this if the user asks for *numbers* or *specific records* (Balance, Transactions).
    - "Can I overpay?" is NOT account_data (It is a Rule/Policy).
    - "What is my balance?" IS account_data.
 
-2. **product_acquisition**: ONLY select this if the user wants to *buy/open* something NEW.
+2. **product_acquisition**: ONLY select this if the user wants to *buy/open* something NEW or asks about specific product rules.
    - "Is approval guaranteed for the personal loan?" -> product_acquisition
    - "What are the rules for mortgages?" is NOT acquisition (It is knowledge).
    - "I want a new mortgage" IS product_acquisition.
 
-3. **knowledge_inquiry**: Select this for ANY question about how the bank works, rules, fees, limits, or "Can I..." questions.
-   - "Can I overpay my mortgage?" -> knowledge_inquiry (It asks about the RULE).
+3. **knowledge_inquiry**: Select this for ANY question about how the bank works, rules, fees, penalties, or "Can I..." questions, EVEN IF they mention a specific product.
+   - "What is the penalty for closing a Fixed Rate Bond early?" -> knowledge_inquiry (Because it requires reading the PDF terms and conditions).
+   - "Can I overpay my mortgage?" -> knowledge_inquiry.
 """
 
-    def _parse_llm_response(self, response_text: str) -> Dict[str, Any]:
-        """
-        Parse LLM response into structured format.
-
-        Args:
-            response_text: Raw LLM response
-
-        Returns:
-            dict: Parsed classification
-        """
-        # Extract fields
-        intent = "general_inquiry"  # Default
-        confidence = 0.5
-        sentiment = "neutral"
-        explanation = ""
-
-        for line in response_text.strip().split("\n"):
-            line = line.strip()
-
-            if line.startswith("INTENT:"):
-                intent = line.split(":", 1)[1].strip().lower()
-            elif line.startswith("CONFIDENCE:"):
-                try:
-                    confidence = float(line.split(":", 1)[1].strip())
-                except Exception as e:
-                    self.logger.warning(f"Confidence parsing error: {e}")
-                    confidence = 0.5
-            elif line.startswith("SENTIMENT:"):
-                sentiment = line.split(":", 1)[1].strip().lower()
-            elif line.startswith("EXPLANATION:"):
-                explanation = line.split(":", 1)[1].strip()
-
-        # Get routing
-        routing = self.INTENTS.get(intent, {}).get("routing", "general_agent")
-
-        return {
-            "intent": intent,
-            "confidence": confidence,
-            "sentiment": sentiment,
-            "explanation": explanation,
-            "routing": routing,
-        }
-
-    # ========================================================================
-    # HELPER METHODS
-    # ========================================================================
-
     def get_supported_intents(self) -> List[str]:
-        """
-        Get list of supported intents.
-
-        Returns:
-            List[str]: Intent names
-        """
         return list(self.INTENTS.keys())
 
     def get_intent_info(self, intent: str) -> Optional[Dict[str, Any]]:
-        """
-        Get information about specific intent.
-
-        Args:
-            intent: Intent name
-
-        Returns:
-            dict or None: Intent information
-        """
         return self.INTENTS.get(intent)

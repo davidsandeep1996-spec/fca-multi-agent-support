@@ -90,10 +90,6 @@ jobs:
       # TESTING
       # ========================================================================
 
-     # ========================================================================
-      # TESTING
-      # ========================================================================
-
       - name: Seed the Database with Python Script
         env:
           # Inject the connection string so your script knows where to insert the data
@@ -105,7 +101,7 @@ jobs:
           # alembic upgrade head
           python -m app.seed_database
 
-      - name: Run tests with pytest
+      - name: 🧪 Run Agent & Worker Tests (Batch 1)
         env:
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
           REDIS_URL: redis://localhost:6379/0
@@ -113,7 +109,94 @@ jobs:
           SECRET_KEY: super-secret-test-key-that-is-at-least-32-chars
           ENVIRONMENT: test
         run: |
-          pytest tests/ -v --tb=short --disable-warnings --cov=app --cov-report=term-missing --cov-report=xml
+          # Runs lightweight agent logic tests first
+          pytest tests/test_account_agent.py tests/test_general_agent.py tests/test_human_agent.py tests/test_product_agent.py -v --tb=short --disable-warnings --cov=app --cov-append --cov-report=term-missing --cov-report=xml
+
+      - name: 🧠 Run Heavy ML Classifiers (Batch 2)
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379/0
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          SECRET_KEY: super-secret-test-key-that-is-at-least-32-chars
+          ENVIRONMENT: test
+        run: |
+          # Forces OS to clear RAM before loading Spacy/Sentence-Transformers again
+          # Uses --cov-append so we don't lose Batch 1's coverage data!
+          pytest tests/test_intent_classifier.py tests/test_compliance_checker.py -v --tb=short --disable-warnings --cov=app --cov-append --cov-report=term-missing --cov-report=xml
+
+      # ========================================================================
+      # HEAVY INTEGRATION TESTS (Split to prevent OOM)
+      # ========================================================================
+
+      - name: 🏗️ Run E2E Coordinator Integration (Part 1)
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379/0
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          SECRET_KEY: super-secret-test-key-that-is-at-least-32-chars
+          ENVIRONMENT: test
+        run: |
+          pytest tests/test_coordinator1.py -v --tb=short --disable-warnings --cov=app --cov-append --cov-report=term-missing --cov-report=xml
+
+      - name: 🏗️ Run E2E Coordinator Integration (Part 2)
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379/0
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          SECRET_KEY: super-secret-test-key-that-is-at-least-32-chars
+          ENVIRONMENT: test
+        if: always()
+        run: |
+          pytest tests/test_coordinator2.py -v --tb=short --disable-warnings --cov=app --cov-append --cov-report=term-missing --cov-report=xml
+
+      - name: 🏗️ Run E2E Coordinator Integration (Part 3)
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379/0
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          SECRET_KEY: super-secret-test-key-that-is-at-least-32-chars
+          ENVIRONMENT: test
+        if: always()
+        run: |
+          pytest tests/test_coordinator3.py -v --tb=short --disable-warnings --cov=app --cov-append --cov-report=term-missing --cov-report=xml
+
+
+      - name: 🏗️ Run Full workflow (Part 1)
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379/0
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          SECRET_KEY: super-secret-test-key-that-is-at-least-32-chars
+          ENVIRONMENT: test
+        if: always()
+        run: |
+          pytest tests/test_full_workflow1.py -v --tb=short --disable-warnings --cov=app --cov-append --cov-report=term-missing --cov-report=xml
+
+      - name: 🏗️ Run Full workflow (Part 2)
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379/0
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          SECRET_KEY: super-secret-test-key-that-is-at-least-32-chars
+          ENVIRONMENT: test
+        if: always()
+        run: |
+          pytest tests/test_full_workflow2.py -v --tb=short --disable-warnings --cov=app --cov-append --cov-report=term-missing --cov-report=xml
+
+      - name: 🏗️ Run Rag
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379/0
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          SECRET_KEY: super-secret-test-key-that-is-at-least-32-chars
+          ENVIRONMENT: test
+        if: always()
+        run: |
+          pytest tests/test_rag_search.py -v --tb=short --disable-warnings --cov=app --cov-append --cov-report=term-missing --cov-report=xml
+
+
+
+
 
   # ============================================================================
   # BUILD JOB

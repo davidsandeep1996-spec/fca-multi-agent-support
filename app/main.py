@@ -12,7 +12,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 import logging
 from fastapi import UploadFile, File, HTTPException
-
+import uvicorn
 from prometheus_fastapi_instrumentator import Instrumentator
 import shutil
 import os
@@ -285,14 +285,7 @@ app = create_application()
 # MAIN ENTRY POINT (for direct execution)
 # ============================================================================
 
-if __name__ == "__main__":
-    import uvicorn
 
-    # Run with uvicorn (development only)
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,  # Auto-reload on code changes
-        log_level="info",
-    )
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port)

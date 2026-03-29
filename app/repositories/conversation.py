@@ -92,7 +92,7 @@ class ConversationRepository(BaseRepository[Conversation]):
         Example: repo.get_by_ticket_id("ESC-101-12345")
         """
         query = select(self.model).where(self.model.ticket_id == ticket_id)
-        result = await self.session.execute(query)
+        result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
     async def get_escalated_by_group(self, assigned_group: str) -> List[Conversation]:
@@ -109,5 +109,5 @@ class ConversationRepository(BaseRepository[Conversation]):
             .order_by(self.model.updated_at.desc())
         )  # Show newest first
 
-        result = await self.session.execute(query)
+        result = await self.db.execute(query)
         return result.scalars().all()

@@ -153,7 +153,7 @@ class ConversationService(BaseService):
                 ticket_id=ticket_id,
             )
 
-            await self.repo.session.commit()
-            await self.repo.session.refresh(conversation)
+            await self.repo.db.commit()
+            await self.repo.db.refresh(conversation)
 
         return conversation
