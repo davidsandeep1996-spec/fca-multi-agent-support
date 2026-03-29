@@ -97,8 +97,22 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
 
         run: |
-          # Run your Python script to build the schema and insert the products
-          # alembic upgrade head
+          # 1. Run a quick script to import models and initialize the database schema
+          python -c "
+          import asyncio
+          # MUST import models so Base.metadata registers them!
+          import app.models.conversation
+          import app.models.message
+          # Add any other model files here if they exist (e.g., customer, account)
+          from app.database import init_db
+
+          async def setup():
+              await init_db()
+
+          asyncio.run(setup())
+          "
+
+          # 2. Run your data seeder
           python -m app.seed_database
 
       - name: 🧪 Run Agent & Worker Tests (Batch 1)
