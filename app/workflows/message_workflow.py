@@ -67,8 +67,7 @@ class MessageWorkflow:
         # Build LangGraph workflow
         self.graph = self._build_graph()
         self.workflow = self.graph.compile(
-            checkpointer=self.checkpointer,
-            interrupt_before=["human_approval"]
+            checkpointer=self.checkpointer, interrupt_before=["human_approval"]
         )
 
     def _build_graph(self):
@@ -106,7 +105,7 @@ class MessageWorkflow:
                 "general": "general",
                 "product": "product",
                 "complaint": "human",
-                "escalate": "human", # Route unknowns to the human bottleneck
+                "escalate": "human",  # Route unknowns to the human bottleneck
             },
         )
 
@@ -194,7 +193,6 @@ class MessageWorkflow:
 
         return self._get_clean_guardrail_state()
 
-
     @observe(as_type="span", name="Node: Classify")
     async def _node_classify(self, state: WorkflowState) -> Dict[str, Any]:
         """Classify intent."""
@@ -230,7 +228,9 @@ class MessageWorkflow:
                 {"customer_id": state.customer_id, "message": state.message},
                 context={"conversation_history": state.history},
             )
-            self.logger.info(f"✅ Account query handled: {response.metadata.get('query_type')}")
+            self.logger.info(
+                f"✅ Account query handled: {response.metadata.get('query_type')}"
+            )
             return {
                 "agent_type": "account",
                 "agent_response": response.content,
@@ -255,7 +255,9 @@ class MessageWorkflow:
                 {"message": state.message},
                 context={"conversation_history": state.history},
             )
-            self.logger.info(f"✅ General inquiry handled: {response.metadata.get('source')}")
+            self.logger.info(
+                f"✅ General inquiry handled: {response.metadata.get('source')}"
+            )
             return {
                 "agent_type": "general",
                 "agent_response": response.content,
@@ -319,7 +321,9 @@ class MessageWorkflow:
             prohibited = [i for i in issues if "Prohibited" in i]
 
             if not is_compliant and not prohibited:
-                self.logger.info("⚠️ Auto-resolving minor compliance issues to avoid Human Loop")
+                self.logger.info(
+                    "⚠️ Auto-resolving minor compliance issues to avoid Human Loop"
+                )
                 is_compliant = True
 
             if self._evaluate_demo_overrides(state.message, prohibited):
@@ -334,10 +338,14 @@ class MessageWorkflow:
 
             if required_disclaimers:
                 disclaimers = "\n\n".join(required_disclaimers)
-                updates["agent_response"] = f"{state.agent_response}\n\n⚠️ Important:\n{disclaimers}"
+                updates["agent_response"] = (
+                    f"{state.agent_response}\n\n⚠️ Important:\n{disclaimers}"
+                )
 
             if not is_compliant:
-                updates["agent_response"] = "I cannot recommend this product due to compliance restrictions (Prohibited Language)."
+                updates["agent_response"] = (
+                    "I cannot recommend this product due to compliance restrictions (Prohibited Language)."
+                )
 
             return updates
         except Exception as e:
@@ -364,7 +372,9 @@ class MessageWorkflow:
                 },
                 context=state.context,
             )
-            self.logger.info(f"✅ Escalation created: {response.metadata.get('escalation_id')}")
+            self.logger.info(
+                f"✅ Escalation created: {response.metadata.get('escalation_id')}"
+            )
             return {
                 "agent_type": "human",
                 "agent_response": response.content,
@@ -379,7 +389,6 @@ class MessageWorkflow:
                 "agent_metadata": {"escalation_id": "SYS_ERR_ESCALATION"},
                 "confidence": 0.0,
             }
-
 
     @observe(as_type="span", name="Node: End")
     async def _node_end(self, state: WorkflowState) -> Dict[str, Any]:
@@ -427,7 +436,9 @@ class MessageWorkflow:
     def _route_by_intent(self, state: WorkflowState) -> str:
         """Route to agent based on intent."""
         intent = state.intent or "unmapped"
-        confidence = state.intent_confidence if state.intent_confidence is not None else 1.0
+        confidence = (
+            state.intent_confidence if state.intent_confidence is not None else 1.0
+        )
 
         # ✅ FIX: Route low confidence or unrecognized intents to Escalation safely
         if confidence < 0.4:

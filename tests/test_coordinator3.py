@@ -3,7 +3,6 @@ from unittest.mock import patch
 from app.coordinator import AgentCoordinator
 
 
-
 @pytest.fixture
 async def coordinator():
     """Provides the real, stateless Agent Coordinator."""
@@ -24,11 +23,11 @@ async def test_invalid_admin_intervention(coordinator):
     # We expect the coordinator to raise a ValueError, not crash blindly
     with pytest.raises(ValueError) as exc_info:
         await coordinator.approve_intervention(
-            conversation_id=fake_conversation_id,
-            new_response="This should fail."
+            conversation_id=fake_conversation_id, new_response="This should fail."
         )
 
     assert "No paused state found" in str(exc_info.value)
+
 
 # ============================================================================
 # 10. DATABASE ROLLBACK SIMULATION (Negative Test)
@@ -45,17 +44,20 @@ async def test_database_rollback_on_failure(coordinator):
     # We mock the MessageWorkflow to forcefully simulate a critical crash mid-transaction
     with patch("app.coordinator.agent_coordinator.MessageWorkflow") as MockWorkflow:
         mock_instance = MockWorkflow.return_value
-        mock_instance.process_message.side_effect = Exception("Simulated Database or LLM Crash")
+        mock_instance.process_message.side_effect = Exception(
+            "Simulated Database or LLM Crash"
+        )
 
         # The coordinator should catch the exception, execute session.rollback(), and re-raise
         with pytest.raises(Exception) as exc_info:
             await coordinator.process_message(
                 message="Hello",
                 customer_id=customer_id,
-                conversation_id=conversation_id
+                conversation_id=conversation_id,
             )
 
         assert "Simulated Database or LLM Crash" in str(exc_info.value)
+
 
 # ============================================================================
 # 11. STATIC HEALTH CHECK (Coverage Completeness)

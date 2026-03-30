@@ -19,12 +19,15 @@ from langfuse import observe, get_client
 # ENTERPRISE SCHEMAS
 # ============================================================================
 
+
 class EscalationPriority(str, Enum):
     """Escalation priority levels."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     URGENT = "urgent"
+
 
 # RESTORED: Your original exact Pydantic Model
 class EscalationTicket(BaseModel):
@@ -39,14 +42,22 @@ class EscalationTicket(BaseModel):
     saved: bool
     created_at: str
 
+
 class PriorityAnalysis(BaseModel):
     """Strict schema for LLM Priority Assessment."""
-    priority: EscalationPriority = Field(description="The semantic priority level of the customer's issue.")
-    reasoning: str = Field(description="A brief explanation of why this priority was chosen.")
+
+    priority: EscalationPriority = Field(
+        description="The semantic priority level of the customer's issue."
+    )
+    reasoning: str = Field(
+        description="A brief explanation of why this priority was chosen."
+    )
+
 
 # ============================================================================
 # HUMAN ESCALATION AGENT
 # ============================================================================
+
 
 class HumanAgent(BaseAgent):
     """
@@ -76,7 +87,9 @@ class HumanAgent(BaseAgent):
         ]
 
     @observe(name="HumanAgent")
-    async def process(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentResponse:
+    async def process(
+        self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None
+    ) -> AgentResponse:
         self.log_request(input_data)
 
         try:
@@ -87,7 +100,9 @@ class HumanAgent(BaseAgent):
             conversation_id = input_data.get("conversation_id")
 
             if not all([message, customer_id, conversation_id]):
-                raise ValueError("message, customer_id, and conversation_id are required")
+                raise ValueError(
+                    "message, customer_id, and conversation_id are required"
+                )
 
             # 1. Semantic Priority Assessment (Upgraded to AI)
             priority = await self._assess_priority(message)
@@ -112,7 +127,7 @@ class HumanAgent(BaseAgent):
                     "priority": priority.value,
                     "assigned_to": escalation.assigned_to,
                     "estimated_response": escalation.estimated_response,
-                    "saved": escalation.saved # RESTORED: Matches your original variable exactly
+                    "saved": escalation.saved,  # RESTORED: Matches your original variable exactly
                 },
                 confidence=0.98,
             )
@@ -137,13 +152,18 @@ class HumanAgent(BaseAgent):
 
         # 1. Hybrid Fast-Path: Catch blatant emergencies instantly to save LLM latency
         message_lower = message.lower()
-        if any(kw in message_lower for kw in ["fraud", "stolen", "unauthorized", "security breach"]):
+        if any(
+            kw in message_lower
+            for kw in ["fraud", "stolen", "unauthorized", "security breach"]
+        ):
             if "not " not in message_lower and "no " not in message_lower:
                 return EscalationPriority.URGENT
 
         # 2. LLM Semantic Assessment
         langfuse = get_client()
-        langfuse.update_current_generation(model=self.config.model_name, model_parameters={"temperature": 0.0})
+        langfuse.update_current_generation(
+            model=self.config.model_name, model_parameters={"temperature": 0.0}
+        )
 
         # ENTERPRISE FIX: Provide a concrete Zero-Shot Example instead of a raw JSON Schema
         prompt = f"""
@@ -168,20 +188,24 @@ class HumanAgent(BaseAgent):
         """
 
         try:
+
             async def _call_llm():
                 return await self.client.chat.completions.create(
                     model=self.config.model_name,
                     messages=[
-                        {"role": "system", "content": "You are a senior customer support triage expert."},
-                        {"role": "user", "content": prompt}
+                        {
+                            "role": "system",
+                            "content": "You are a senior customer support triage expert.",
+                        },
+                        {"role": "user", "content": prompt},
                     ],
                     temperature=0.0,
-                    response_format={"type": "json_object"}
+                    response_format={"type": "json_object"},
                 )
 
             response = await self.execute_with_retry(_call_llm)
 
-            if hasattr(response, 'usage') and response.usage:
+            if hasattr(response, "usage") and response.usage:
                 langfuse.update_current_generation(
                     usage_details={
                         "prompt_tokens": response.usage.prompt_tokens,
@@ -190,7 +214,9 @@ class HumanAgent(BaseAgent):
                     }
                 )
 
-            analysis = PriorityAnalysis.model_validate_json(response.choices[0].message.content)
+            analysis = PriorityAnalysis.model_validate_json(
+                response.choices[0].message.content
+            )
             return analysis.priority
 
         except Exception as e:
@@ -222,7 +248,10 @@ class HumanAgent(BaseAgent):
         if conversation_service:
             try:
                 # ENTERPRISE FIX: Throw hard error if DB is disconnected, never swallow it!
-                if hasattr(conversation_service, "db") and conversation_service.db is not None:
+                if (
+                    hasattr(conversation_service, "db")
+                    and conversation_service.db is not None
+                ):
                     await conversation_service.escalate_conversation(
                         conversation_id,
                         reason=issue,
@@ -231,9 +260,13 @@ class HumanAgent(BaseAgent):
                         ticket_id=ticket_id,
                     )
                     saved_status = True
-                    self.logger.info(f"Escalation saved to DB for conversation {conversation_id}")
+                    self.logger.info(
+                        f"Escalation saved to DB for conversation {conversation_id}"
+                    )
                 else:
-                    raise ConnectionError("Database connection is null in ConversationService")
+                    raise ConnectionError(
+                        "Database connection is null in ConversationService"
+                    )
             except Exception as e:
                 self.logger.error(f"CRITICAL: Failed to save escalation to DB: {e}")
                 raise e
@@ -269,7 +302,9 @@ class HumanAgent(BaseAgent):
         }
         return teams.get(priority, "Support Team")
 
-    def _generate_escalation_response(self, escalation: EscalationTicket, priority: EscalationPriority) -> str:
+    def _generate_escalation_response(
+        self, escalation: EscalationTicket, priority: EscalationPriority
+    ) -> str:
         response = (
             f"Thank you for bringing this to our attention.\n\n"
             f"We've escalated your issue to our {escalation.assigned_to}.\n\n"

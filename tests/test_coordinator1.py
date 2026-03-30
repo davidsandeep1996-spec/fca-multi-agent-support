@@ -15,12 +15,11 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 logging.getLogger("langfuse").setLevel(logging.WARNING)
 
+
 @pytest.fixture
 async def coordinator():
     """Provides the real, stateless Agent Coordinator."""
     return AgentCoordinator()
-
-
 
 
 # ============================================================================
@@ -38,7 +37,7 @@ async def test_e2e_multi_turn_account_flow(coordinator):
     response_1 = await coordinator.process_message(
         message="Hello, I need some help with my finances.",
         customer_id=customer_id,
-        conversation_id=conversation_id
+        conversation_id=conversation_id,
     )
     assert response_1["status"] == "success"
     assert response_1["agent"] in ["general", "system"]
@@ -47,7 +46,7 @@ async def test_e2e_multi_turn_account_flow(coordinator):
     response_2 = await coordinator.process_message(
         message="Can you tell me my current account balance?",
         customer_id=customer_id,
-        conversation_id=conversation_id
+        conversation_id=conversation_id,
     )
     assert response_2["status"] == "success"
     assert response_2["agent"] == "account"
@@ -57,7 +56,8 @@ async def test_e2e_multi_turn_account_flow(coordinator):
     async with AsyncSessionLocal() as session:
         msg_svc = MessageService(db=session)
         history = await msg_svc.get_conversation_messages(conversation_id)
-        assert len(history) >= 4 # At least 2 user messages and 2 agent responses
+        assert len(history) >= 4  # At least 2 user messages and 2 agent responses
+
 
 # ============================================================================
 # 2. REAL KNOWLEDGE INQUIRY WITH RAG (Customer 2, Conv 2)
@@ -73,7 +73,7 @@ async def test_e2e_knowledge_rag_flow(coordinator):
     response = await coordinator.process_message(
         message="What is the penalty if I withdraw money early from my Fixed Rate Bond?",
         customer_id=customer_id,
-        conversation_id=conversation_id
+        conversation_id=conversation_id,
     )
 
     assert response["status"] == "success"
@@ -82,7 +82,11 @@ async def test_e2e_knowledge_rag_flow(coordinator):
     assert response["intent"] == "knowledge_inquiry"
 
     # The real LLM should have synthesized the penalty rule from the RAG
-    assert "locked" in response["response"].lower() or "term" in response["response"].lower()
+    assert (
+        "locked" in response["response"].lower()
+        or "term" in response["response"].lower()
+    )
+
 
 # ============================================================================
 # 3. REAL HUMAN ESCALATION (Customer 3, Conv 3)
@@ -99,7 +103,7 @@ async def test_e2e_human_escalation_flow(coordinator):
     response = await coordinator.process_message(
         message="I want to file a formal complaint about my account.",
         customer_id=customer_id,
-        conversation_id=conversation_id
+        conversation_id=conversation_id,
     )
 
     # Assert Coordinator caught the paused graph
@@ -107,6 +111,7 @@ async def test_e2e_human_escalation_flow(coordinator):
     assert response["escalated"] is True
     assert "escalation_id" in response
     assert "human review" in response["response"].lower()
+
 
 # ============================================================================
 # 4. REAL SSE STREAMING TEST (Customer 10, Conv 14)
@@ -124,7 +129,7 @@ async def test_e2e_streaming_events(coordinator):
     async for event in coordinator.stream_message(
         message="I want to apply for a mortgage.",
         customer_id=customer_id,
-        conversation_id=conversation_id
+        conversation_id=conversation_id,
     ):
         events.append(event)
 
@@ -136,6 +141,7 @@ async def test_e2e_streaming_events(coordinator):
     final_event = events[-1]
     assert final_event["type"] == "response"
     assert "mortgage" in final_event["content"].lower()
+
 
 # ============================================================================
 # 5. REAL DASHBOARD ANALYTICS TEST
@@ -149,7 +155,7 @@ async def test_e2e_statistics_and_history(coordinator):
     stats = await coordinator.get_statistics()
     assert "total_conversations" in stats
     assert "total_messages" in stats
-    assert stats["total_conversations"] >= 3 # We just ran tests on 3+ convos
+    assert stats["total_conversations"] >= 3  # We just ran tests on 3+ convos
 
     # 2. Test specific Conversation UI History
     history = await coordinator.get_db_conversation_history(conversation_id=1, limit=50)
@@ -163,7 +169,3 @@ async def test_e2e_statistics_and_history(coordinator):
     assert isinstance(customer_convs, list)
     assert len(customer_convs) >= 1
     assert customer_convs[0]["conversation_id"] == 1
-
-
-
-

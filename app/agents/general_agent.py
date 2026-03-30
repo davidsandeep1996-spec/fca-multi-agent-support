@@ -14,6 +14,7 @@ from app.services.cache_service import CacheService
 from langfuse import observe
 from langfuse import get_client
 
+
 class GeneralAgent(BaseAgent):
     def __init__(
         self,
@@ -35,10 +36,18 @@ class GeneralAgent(BaseAgent):
         return "Handles general inquiries, FAQs, and knowledge base document retrieval."
 
     def _get_capabilities(self) -> List[str]:
-        return ["FAQ lookup", "Document RAG retrieval", "Conversational memory", "Privacy-safe handling", "Semantic Caching"]
+        return [
+            "FAQ lookup",
+            "Document RAG retrieval",
+            "Conversational memory",
+            "Privacy-safe handling",
+            "Semantic Caching",
+        ]
 
     @observe(name="GeneralAgent")
-    async def process(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentResponse:
+    async def process(
+        self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None
+    ) -> AgentResponse:
         await self.validate_input(input_data)
         self.log_request(input_data)
 
@@ -66,7 +75,9 @@ class GeneralAgent(BaseAgent):
             if faq_answer:
                 # Self-Warming Cache: Save DB result to Redis for the next user (24h TTL)
                 if self.cache_service:
-                    await self.cache_service.set_cached_response(message, faq_answer, ttl_seconds=86400)
+                    await self.cache_service.set_cached_response(
+                        message, faq_answer, ttl_seconds=86400
+                    )
 
                 return self.create_response(
                     content=faq_answer,
@@ -78,11 +89,15 @@ class GeneralAgent(BaseAgent):
             # 🧠 TIER 2: Vector RAG Search + Groq LLM Generation
             # =================================================================
             rag_documents = await self._lookup_rag_db(message)
-            response = await self._generate_llm_response(message, rag_documents, history)
+            response = await self._generate_llm_response(
+                message, rag_documents, history
+            )
 
             # Self-Warming Cache: Cache successful RAG queries (1h TTL) to avoid regenerating
             if rag_documents and response.confidence > 0.8 and self.cache_service:
-                await self.cache_service.set_cached_response(message, response.content, ttl_seconds=3600)
+                await self.cache_service.set_cached_response(
+                    message, response.content, ttl_seconds=3600
+                )
 
             self.log_response(response)
             return response
@@ -122,11 +137,13 @@ class GeneralAgent(BaseAgent):
         self,
         message: str,
         rag_documents: List[Dict[str, Any]],
-        history: List[Dict[str, str]]
+        history: List[Dict[str, str]],
     ) -> AgentResponse:
 
         langfuse = get_client()
-        langfuse.update_current_generation(model=self.config.model_name, model_parameters={"temperature": 0.7})
+        langfuse.update_current_generation(
+            model=self.config.model_name, model_parameters={"temperature": 0.7}
+        )
 
         # 1. Format System Prompt Safely
         system_prompt = self._build_system_prompt()
@@ -135,6 +152,7 @@ class GeneralAgent(BaseAgent):
         user_prompt = self._build_user_prompt(message, rag_documents, history)
 
         try:
+
             async def _call_llm():
                 return await self.client.chat.completions.create(
                     model=self.config.model_name,
@@ -149,9 +167,11 @@ class GeneralAgent(BaseAgent):
 
             # ENTERPRISE FIX: Track exactly where the knowledge came from
             source = "rag_database" if rag_documents else "llm_fallback"
-            citations = [doc.get("filename", "Unknown Document") for doc in rag_documents]
+            citations = [
+                doc.get("filename", "Unknown Document") for doc in rag_documents
+            ]
 
-            if hasattr(response, 'usage') and response.usage:
+            if hasattr(response, "usage") and response.usage:
                 langfuse.update_current_generation(
                     usage_details={
                         "prompt_tokens": response.usage.prompt_tokens,
@@ -164,13 +184,15 @@ class GeneralAgent(BaseAgent):
                 content=response.choices[0].message.content,
                 metadata={
                     "source": source,
-                    "citations": list(set(citations)) # Pass PDF filenames back to the frontend!
+                    "citations": list(
+                        set(citations)
+                    ),  # Pass PDF filenames back to the frontend!
                 },
                 confidence=0.85 if rag_documents else 0.7,
             )
 
         except Exception as e:
-            raise e # Caught safely in the outer process() method
+            raise e  # Caught safely in the outer process() method
 
     def _build_system_prompt(self) -> str:
         """Clean, deduped system instructions."""
@@ -184,16 +206,31 @@ CRITICAL RULES:
    If the answer is not in the documents, state that you do not have that specific policy information.
 3. MEMORY: Use the provided CONVERSATION HISTORY to answer follow-up questions."""
 
-    def _build_user_prompt(self, message: str, rag_documents: List[Dict[str, Any]], history: List[Dict[str, str]]) -> str:
+    def _build_user_prompt(
+        self,
+        message: str,
+        rag_documents: List[Dict[str, Any]],
+        history: List[Dict[str, str]],
+    ) -> str:
         """Safely injects dynamic user state into the prompt without corrupting system instructions."""
         prompt_parts = []
 
         if history:
-            history_str = "\n".join([f"{msg.get('role', 'user').upper()}: {msg.get('content', '')}" for msg in history[-5:]])
+            history_str = "\n".join(
+                [
+                    f"{msg.get('role', 'user').upper()}: {msg.get('content', '')}"
+                    for msg in history[-5:]
+                ]
+            )
             prompt_parts.append(f"CONVERSATION HISTORY:\n{history_str}")
 
         if rag_documents:
-            context_str = "\n".join([f"--- Source: {doc.get('filename', 'Unknown')} ---\n{doc.get('content', '')}" for doc in rag_documents])
+            context_str = "\n".join(
+                [
+                    f"--- Source: {doc.get('filename', 'Unknown')} ---\n{doc.get('content', '')}"
+                    for doc in rag_documents
+                ]
+            )
             prompt_parts.append(f"KNOWLEDGE BASE DOCUMENTS:\n{context_str}")
 
         prompt_parts.append(f"CURRENT QUESTION:\n{message}")

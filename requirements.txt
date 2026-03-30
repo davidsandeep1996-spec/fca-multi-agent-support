@@ -285,3 +285,5 @@ celery==5.3.6
 redis==5.0.1
 
 langgraph-checkpoint-postgres>=2.0.0
+
+huggingface_hub>=0.21.0

@@ -12,15 +12,19 @@ from app.services import AccountService, CustomerService, TransactionService
 # ENTERPRISE SCHEMAS
 # ============================================================================
 
+
 class AccountQueryAnalysis(BaseModel):
     """Strict schema for determining what the user wants to know about their account."""
-    query_type: Literal["balance", "transactions", "statement", "details", "general"] = Field(
-        description="The exact type of account query the user is making."
-    )
+
+    query_type: Literal[
+        "balance", "transactions", "statement", "details", "general"
+    ] = Field(description="The exact type of account query the user is making.")
+
 
 # ============================================================================
 # ACCOUNT AGENT
 # ============================================================================
+
 
 class AccountAgent(BaseAgent):
     def __init__(
@@ -35,9 +39,7 @@ class AccountAgent(BaseAgent):
         self.client = AsyncGroq(api_key=self.config.api_key)
 
         if not all([account_service, customer_service, transaction_service]):
-            raise ValueError(
-                "AccountAgent requires DB-backed services."
-            )
+            raise ValueError("AccountAgent requires DB-backed services.")
 
         self.account_service = account_service
         self.customer_service = customer_service
@@ -47,7 +49,12 @@ class AccountAgent(BaseAgent):
         return "Account Agent - Handles customer account balances, transactions, and statements."
 
     def _get_capabilities(self) -> List[str]:
-        return ["Balance retrieval", "Transaction history", "Account statements", "Account details"]
+        return [
+            "Balance retrieval",
+            "Transaction history",
+            "Account statements",
+            "Account details",
+        ]
 
     def _format_currency(self, amount: float) -> str:
         return f"£{amount:,.2f}"
@@ -73,7 +80,9 @@ class AccountAgent(BaseAgent):
         return date_val.strftime("%d %b %Y")
 
     @observe(name="AccountAgent")
-    async def process(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentResponse:
+    async def process(
+        self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None
+    ) -> AgentResponse:
         self.log_request(input_data)
 
         try:
@@ -88,16 +97,19 @@ class AccountAgent(BaseAgent):
             query_type = await self._determine_query_type(message)
 
             # 2. Fetch Raw Database Data
-            async with self.customer_service as cust_svc, \
-                       self.account_service as acct_svc, \
-                       self.transaction_service as txn_svc:
-
+            async with (
+                self.customer_service as cust_svc,
+                self.account_service as acct_svc,
+                self.transaction_service as txn_svc,
+            ):
                 raw_data = await self._fetch_real_data(
                     cust_svc, acct_svc, txn_svc, str(customer_id), query_type
                 )
 
             # 3. AI Conversational Generation
-            conversational_response = await self._generate_conversational_response(message, raw_data)
+            conversational_response = await self._generate_conversational_response(
+                message, raw_data
+            )
 
             response = self.create_response(
                 content=conversational_response,
@@ -144,17 +156,21 @@ class AccountAgent(BaseAgent):
                 model="llama-3.1-8b-instant",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
             )
             # We still use Pydantic to strictly validate the output!
-            analysis = AccountQueryAnalysis.model_validate_json(response.choices[0].message.content)
+            analysis = AccountQueryAnalysis.model_validate_json(
+                response.choices[0].message.content
+            )
             return analysis.query_type
 
         except Exception as e:
             self.logger.error(f"LLM Intent Error: {e}")
             return "general"
 
-    async def _generate_conversational_response(self, user_message: str, raw_data: Dict[str, Any]) -> str:
+    async def _generate_conversational_response(
+        self, user_message: str, raw_data: Dict[str, Any]
+    ) -> str:
         """Feeds raw DB JSON to the LLM to generate a natural, helpful response."""
         if raw_data.get("error"):
             return "I'm sorry, I couldn't locate your active account details at this moment."
@@ -164,7 +180,7 @@ class AccountAgent(BaseAgent):
         The user asked: "{user_message}"
 
         Here is the securely retrieved raw data from their bank account:
-        {json.dumps(raw_data.get('data', {}), indent=2)}
+        {json.dumps(raw_data.get("data", {}), indent=2)}
 
         Task:
         Formulate a polite, clear, and professional response to the user answering their question using ONLY this data.
@@ -174,7 +190,7 @@ class AccountAgent(BaseAgent):
             response = await self.client.chat.completions.create(
                 model="llama-3.1-8b-instant",
                 messages=[{"role": "system", "content": prompt}],
-                temperature=0.3
+                temperature=0.3,
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
@@ -201,38 +217,51 @@ class AccountAgent(BaseAgent):
             return {
                 "data": {
                     "account_number": getattr(acct, "account_number", "N/A"),
-                    "account_type": self._friendly_account_type(getattr(acct, "type", None)),
-                    "balance": self._format_currency(float(getattr(acct, "balance", 0.0))),
-                    "status": "Active"
+                    "account_type": self._friendly_account_type(
+                        getattr(acct, "type", None)
+                    ),
+                    "balance": self._format_currency(
+                        float(getattr(acct, "balance", 0.0))
+                    ),
+                    "status": "Active",
                 },
-                "data_points": ["balance"]
+                "data_points": ["balance"],
             }
 
         elif query_type == "transactions":
             # FIX: We need the internal integer 'id' for transactions
             account_id = getattr(acct, "id", None)
-            all_transactions = await txn_svc.get_transactions_by_account(account_id, limit=5)
+            all_transactions = await txn_svc.get_transactions_by_account(
+                account_id, limit=5
+            )
 
-            txns = [{
-                "description": getattr(t, "description", "Unknown"),
-                "amount": self._format_currency(float(getattr(t, "amount", 0.0))),
-                "date": self._friendly_date(getattr(t, "date", None) or getattr(t, "transaction_date", None))
-            } for t in all_transactions]
+            txns = [
+                {
+                    "description": getattr(t, "description", "Unknown"),
+                    "amount": self._format_currency(float(getattr(t, "amount", 0.0))),
+                    "date": self._friendly_date(
+                        getattr(t, "date", None) or getattr(t, "transaction_date", None)
+                    ),
+                }
+                for t in all_transactions
+            ]
 
             return {
                 "data": {"recent_transactions": txns},
-                "data_points": ["transactions"]
+                "data_points": ["transactions"],
             }
 
         elif query_type == "details":
             return {
                 "data": {
                     "account_number": getattr(acct, "account_number", "N/A"),
-                    "account_type": self._friendly_account_type(getattr(acct, "type", None)),
+                    "account_type": self._friendly_account_type(
+                        getattr(acct, "type", None)
+                    ),
                     "opened_on": self._friendly_date(getattr(acct, "created_at", None)),
-                    "status": "Active"
+                    "status": "Active",
                 },
-                "data_points": ["details"]
+                "data_points": ["details"],
             }
 
         elif query_type == "statement":
@@ -240,9 +269,9 @@ class AccountAgent(BaseAgent):
                 "data": {
                     "account_number": getattr(acct, "account_number", "N/A"),
                     "email": getattr(customer, "email", "your registered email"),
-                    "statement_status": "Generated and sent"
+                    "statement_status": "Generated and sent",
                 },
-                "data_points": ["statement_generated"]
+                "data_points": ["statement_generated"],
             }
 
         return {"data": {"note": "Account verified. Awaiting specific inquiry."}}

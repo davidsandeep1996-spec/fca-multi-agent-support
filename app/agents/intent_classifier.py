@@ -18,25 +18,35 @@ from app.services import ProductService
 # ENTERPRISE SCHEMAS
 # ============================================================================
 
+
 class IntentClassification(BaseModel):
     """Strict schema for intent classification and routing."""
+
     intent: Literal[
         "product_acquisition",
         "account_data",
         "knowledge_inquiry",
         "complaint",
-        "general_inquiry"
+        "general_inquiry",
     ] = Field(description="The classified intent of the user's message.")
 
-    confidence: float = Field(ge=0.0, le=1.0, description="Confidence score from 0.0 to 1.0.")
+    confidence: float = Field(
+        ge=0.0, le=1.0, description="Confidence score from 0.0 to 1.0."
+    )
 
-    sentiment: Literal["positive", "neutral", "negative"] = Field(description="The emotional sentiment of the message.")
+    sentiment: Literal["positive", "neutral", "negative"] = Field(
+        description="The emotional sentiment of the message."
+    )
 
-    explanation: str = Field(description="A brief, 1-sentence explanation of why this intent was chosen.")
+    explanation: str = Field(
+        description="A brief, 1-sentence explanation of why this intent was chosen."
+    )
+
 
 # ============================================================================
 # INTENT CLASSIFIER AGENT
 # ============================================================================
+
 
 class IntentClassifierAgent(BaseAgent):
     """
@@ -45,7 +55,7 @@ class IntentClassifierAgent(BaseAgent):
     """
 
     # ========================================================================
-    # INTENT CATEGORIES 
+    # INTENT CATEGORIES
     # ========================================================================
 
     INTENTS = {
@@ -150,7 +160,9 @@ class IntentClassifierAgent(BaseAgent):
             "Context-aware classification",
         ]
 
-    def _limit_history_context(self, context: Optional[Dict[str, Any]], max_turns: int = 2) -> List[Dict[str, str]]:
+    def _limit_history_context(
+        self, context: Optional[Dict[str, Any]], max_turns: int = 2
+    ) -> List[Dict[str, str]]:
         if context and "conversation_history" in context:
             history = context["conversation_history"]
             if history:
@@ -158,7 +170,9 @@ class IntentClassifierAgent(BaseAgent):
         return []
 
     @observe(name="IntentClassifier")
-    async def process(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentResponse:
+    async def process(
+        self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None
+    ) -> AgentResponse:
         self.log_request(input_data)
 
         try:
@@ -193,23 +207,28 @@ class IntentClassifierAgent(BaseAgent):
                     "sentiment": "neutral",
                     "routing": "general_agent",
                     "explanation": "System fallback due to technical error.",
-                    "error": str(e)
+                    "error": str(e),
                 },
                 confidence=0.0,
             )
 
     @observe(as_type="generation", name="Groq-Intent-Classification")
-    async def _classify_intent(self, message: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def _classify_intent(
+        self, message: str, context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
 
         langfuse = get_client()
         langfuse.update_current_generation(
             model=self.config.model_name,
-            model_parameters={"temperature": 0.0}, # Keep temp 0 for deterministic routing
+            model_parameters={
+                "temperature": 0.0
+            },  # Keep temp 0 for deterministic routing
         )
 
         prompt = self._build_classification_prompt(message, context)
 
         try:
+
             async def _call_llm():
                 return await self.client.chat.completions.create(
                     model="llama-3.1-8b-instant",
@@ -218,12 +237,12 @@ class IntentClassifierAgent(BaseAgent):
                         {"role": "user", "content": prompt},
                     ],
                     temperature=0.0,
-                    response_format={"type": "json_object"}
+                    response_format={"type": "json_object"},
                 )
 
             response = await self.execute_with_retry(_call_llm)
 
-            if hasattr(response, 'usage') and response.usage:
+            if hasattr(response, "usage") and response.usage:
                 langfuse.update_current_generation(
                     usage_details={
                         "prompt_tokens": response.usage.prompt_tokens,
@@ -232,8 +251,12 @@ class IntentClassifierAgent(BaseAgent):
                     }
                 )
 
-            parsed_data = IntentClassification.model_validate_json(response.choices[0].message.content)
-            routing = self.INTENTS.get(parsed_data.intent, {}).get("routing", "general_agent")
+            parsed_data = IntentClassification.model_validate_json(
+                response.choices[0].message.content
+            )
+            routing = self.INTENTS.get(parsed_data.intent, {}).get(
+                "routing", "general_agent"
+            )
 
             return {
                 "intent": parsed_data.intent,
@@ -247,7 +270,9 @@ class IntentClassifierAgent(BaseAgent):
             self.logger.error(f"LLM parsing failed: {e}")
             raise e
 
-    def _build_classification_prompt(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
+    def _build_classification_prompt(
+        self, message: str, context: Optional[Dict[str, Any]] = None
+    ) -> str:
         # ENTERPRISE FIX: Inject the Training Phrases (Examples) into the prompt like Dialogflow!
         intent_blocks = []
         for intent, data in self.INTENTS.items():
@@ -266,7 +291,12 @@ class IntentClassifierAgent(BaseAgent):
 """
         recent_history = self._limit_history_context(context, max_turns=2)
         if recent_history:
-            history_str = "\n".join([f"{msg.get('role', 'user').upper()}: {msg.get('content', '')}" for msg in recent_history])
+            history_str = "\n".join(
+                [
+                    f"{msg.get('role', 'user').upper()}: {msg.get('content', '')}"
+                    for msg in recent_history
+                ]
+            )
             prompt += f"PREVIOUS CONVERSATION HISTORY:\n{history_str}\n\n"
 
         prompt += f"""CURRENT CUSTOMER MESSAGE: "{message}"

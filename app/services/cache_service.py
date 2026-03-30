@@ -7,6 +7,7 @@ from typing import Optional
 import redis.asyncio as redis
 from app.config import settings
 
+
 class CacheService:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
@@ -28,7 +29,9 @@ class CacheService:
             self.logger.error(f"Redis GET Error: {e}")
             return None
 
-    async def set_cached_response(self, query: str, response: str, ttl_seconds: int = 3600):
+    async def set_cached_response(
+        self, query: str, response: str, ttl_seconds: int = 3600
+    ):
         """Save a response to Redis with a Time-To-Live (TTL)."""
         try:
             cache_key = self._generate_key(query)
@@ -41,7 +44,9 @@ class CacheService:
     def _generate_key(self, query: str) -> str:
         """Normalize the query to ensure minor typos/casing don't miss the cache."""
         # Lowercase, strip whitespace, and remove punctuation/special characters
-        normalized = "".join(c for c in query.lower() if c.isalnum() or c.isspace()).strip()
+        normalized = "".join(
+            c for c in query.lower() if c.isalnum() or c.isspace()
+        ).strip()
         # Collapse multiple spaces into one
         normalized = " ".join(normalized.split())
         return f"faq_cache:{normalized}"

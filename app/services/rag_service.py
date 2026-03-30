@@ -7,19 +7,22 @@ Optimized for low-memory environments (< 512MB RAM).
 import os
 import logging
 import re
-import httpx
 from typing import List, Dict, Any
 from sqlalchemy import Column, Integer, String, Text, select, func
 from pgvector.sqlalchemy import Vector
 import PyPDF2
 
 from app.database import Base, AsyncSessionLocal
-from app.config import settings
+
+# 1. Import the official Async Client
+from huggingface_hub import AsyncInferenceClient
 
 logger = logging.getLogger(__name__)
 
+
 class DocumentChunk(Base):
     """Stores document text chunks and their mathematical vector embeddings."""
+
     __tablename__ = "document_chunks"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -27,40 +30,49 @@ class DocumentChunk(Base):
     content = Column(Text, nullable=False)
     embedding = Column(Vector(384))
 
+
 class RAGService:
     def __init__(self):
-        self.logger = logging.getLogger(__name__)
-        # ✅ Using the exact same model via API so existing DB vectors don't break!
-        self.hf_api_url = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
+        # The model from your snippet
+        self.model_name = "sentence-transformers/all-MiniLM-L6-v2"
 
-        # We will pull the HF token from settings
-        self.hf_token = getattr(settings, "hf_token", None)
-        if not self.hf_token:
-            self.logger.warning("No HF_TOKEN found! Embeddings will fail unless provided.")
+        # 2. Initialize the client dynamically
+        # It will automatically pick up the HF_TOKEN from your environment variables
+        self.client = AsyncInferenceClient(token=os.environ.get("HF_TOKEN"))
 
     async def _get_embedding(self, text: str) -> List[float]:
-        """Fetches a 384-dimensional vector from Hugging Face's Free API."""
-        headers = {"Authorization": f"Bearer {self.hf_token}"}
+        """
+        Gets the vector embedding for a piece of text using the new InferenceClient.
+        """
+        try:
+            # 3. Use feature_extraction to get the raw vector numbers for pgvector!
+            embedding = await self.client.feature_extraction(
+                text, model=self.model_name
+            )
 
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.post(
-                    self.hf_api_url,
-                    headers=headers,
-                    json={"inputs": text},
-                    timeout=10.0
-                )
-                response.raise_for_status()
-                return response.json() # Returns the List[float]
-            except Exception as e:
-                self.logger.error(f"Hugging Face API Error: {e}")
-                # Fallback to prevent complete system crash (returns a zero-vector)
-                return [0.0] * 384
+            # Ensure it is a flat Python list for SQLAlchemy
+            if hasattr(embedding, "tolist"):
+                embedding = embedding.tolist()
+
+            # Sometimes the API wraps the vector in an outer list [[0.1, 0.2...]]
+            if (
+                isinstance(embedding, list)
+                and len(embedding) > 0
+                and isinstance(embedding[0], list)
+            ):
+                return embedding[0]
+
+            return embedding
+
+        except Exception as e:
+            logger.error(f"Hugging Face API Error: {e}")
+            # Safe fallback so the database transaction doesn't crash
+            return [0.0] * 384
 
     def _chunk_text(self, text: str) -> List[str]:
         """Resilient Regex Chunking to handle messy PDF layouts."""
-        clean_text = re.sub(r'\s+', ' ', text).strip()
-        raw_segments = re.split(r'\s*[Qq]\s*:\s*', clean_text)
+        clean_text = re.sub(r"\s+", " ", text).strip()
+        raw_segments = re.split(r"\s*[Qq]\s*:\s*", clean_text)
         chunks = []
         for segment in raw_segments:
             seg = segment.strip()
@@ -81,9 +93,10 @@ class RAGService:
         chunks = self._chunk_text(text)
         async with AsyncSessionLocal() as session:
             for chunk_text in chunks:
-                # ✅ Now calls the API instead of a local PyTorch model
                 vector = await self._get_embedding(chunk_text)
-                doc = DocumentChunk(filename=filename, content=chunk_text, embedding=vector)
+                doc = DocumentChunk(
+                    filename=filename, content=chunk_text, embedding=vector
+                )
                 session.add(doc)
             await session.commit()
         return len(chunks)
@@ -106,8 +119,8 @@ class RAGService:
             lexical_stmt = (
                 select(DocumentChunk)
                 .where(
-                    func.to_tsvector('english', DocumentChunk.content).op('@@')(
-                        func.websearch_to_tsquery('english', query)
+                    func.to_tsvector("english", DocumentChunk.content).op("@@")(
+                        func.websearch_to_tsquery("english", query)
                     )
                 )
                 .limit(30)
@@ -126,6 +139,14 @@ class RAGService:
             rrf_scores[res.id] = rrf_scores.get(res.id, 0) + (2.0 / (k + rank + 1))
 
         all_matches = {res.id: res for res in (vector_results + lexical_results)}
-        sorted_ids = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)
+        sorted_ids = sorted(
+            rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True
+        )
 
-        return [{"filename": all_matches[doc_id].filename, "content": all_matches[doc_id].content} for doc_id in sorted_ids[:limit]]
+        return [
+            {
+                "filename": all_matches[doc_id].filename,
+                "content": all_matches[doc_id].content,
+            }
+            for doc_id in sorted_ids[:limit]
+        ]

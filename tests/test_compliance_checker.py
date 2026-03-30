@@ -7,11 +7,13 @@ from app.agents.base import AgentConfig
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("langfuse").setLevel(logging.WARNING)
 
+
 @pytest.fixture
 def compliance_agent():
     """Enterprise Fixture for Compliance Checker Agent."""
     config = AgentConfig()
     return ComplianceCheckerAgent(config=config)
+
 
 @pytest.mark.asyncio
 async def test_short_circuit_prohibited_word(compliance_agent):
@@ -26,7 +28,11 @@ async def test_short_circuit_prohibited_word(compliance_agent):
     # Verify the fast heuristic was triggered
     assert any("risk-free" in issue.lower() for issue in response.metadata["issues"])
     # Verify the short-circuit warning was injected
-    assert any("fast keyword heuristic triggered" in warning.lower() for warning in response.metadata["warnings"])
+    assert any(
+        "fast keyword heuristic triggered" in warning.lower()
+        for warning in response.metadata["warnings"]
+    )
+
 
 @pytest.mark.asyncio
 async def test_false_positive_bypass(compliance_agent):
@@ -36,10 +42,13 @@ async def test_false_positive_bypass(compliance_agent):
         "content": "Please note that returns on this investment are not guaranteed and your capital is at risk. You could lose all of your capital. Past performance is not a reliable indicator of future results. Please seek independent advice if necessary."
     }
 
-    response = await compliance_agent.process(input_data, context={"product_type": "investment"})
+    response = await compliance_agent.process(
+        input_data, context={"product_type": "investment"}
+    )
 
     assert response.metadata["is_compliant"] is True
     assert len(response.metadata["issues"]) == 0
+
 
 @pytest.mark.asyncio
 async def test_semantic_violation_llm_catch(compliance_agent):
@@ -54,7 +63,11 @@ async def test_semantic_violation_llm_catch(compliance_agent):
     # The fast rules won't catch this, so the LLM MUST generate the issue
     assert len(response.metadata["issues"]) > 0
     # Ensure the short circuit warning is NOT there (meaning the LLM actually ran)
-    assert not any("fast keyword heuristic triggered" in warning.lower() for warning in response.metadata["warnings"])
+    assert not any(
+        "fast keyword heuristic triggered" in warning.lower()
+        for warning in response.metadata["warnings"]
+    )
+
 
 @pytest.mark.asyncio
 async def test_perfect_compliance_happy_path(compliance_agent):
@@ -68,6 +81,7 @@ async def test_perfect_compliance_happy_path(compliance_agent):
 
     assert response.metadata["is_compliant"] is True
     assert "✅ Content is FCA compliant" in response.content
+
 
 @pytest.mark.asyncio
 async def test_deterministic_disclaimer_injection(compliance_agent):
@@ -83,7 +97,8 @@ async def test_deterministic_disclaimer_injection(compliance_agent):
 
     assert any("Representative APR" in d for d in disclaimers)
     assert any("MoneyHelper or StepChange" in d for d in disclaimers)
-    
+
+
 @pytest.mark.asyncio
 async def test_graceful_degradation_empty_content(compliance_agent):
     """Scenario 6: Missing content should safely degrade instead of crashing the server."""

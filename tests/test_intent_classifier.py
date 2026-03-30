@@ -10,6 +10,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("langfuse").setLevel(logging.WARNING)
 logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
+
 @pytest.fixture
 async def intent_agent():
     """True Enterprise Integration Fixture using REAL Services and REAL LLM."""
@@ -18,7 +19,9 @@ async def intent_agent():
     from app.config import settings
 
     # 1. Connect to the real test database
-    test_engine = create_async_engine(settings.database_url, poolclass=NullPool, echo=False)
+    test_engine = create_async_engine(
+        settings.database_url, poolclass=NullPool, echo=False
+    )
     session = AsyncSession(bind=test_engine, expire_on_commit=False)
 
     try:
@@ -36,7 +39,9 @@ async def intent_agent():
 @pytest.mark.asyncio
 async def test_intent_product_acquisition(intent_agent):
     """Scenario 1: User explicitly wants to apply for a specific product."""
-    input_data = {"message": "I am looking to buy a house and need to apply for a Fixed Rate Mortgage."}
+    input_data = {
+        "message": "I am looking to buy a house and need to apply for a Fixed Rate Mortgage."
+    }
     response = await intent_agent.process(input_data)
 
     # 1. Strict Deterministic Routing Asserts
@@ -48,7 +53,7 @@ async def test_intent_product_acquisition(intent_agent):
     is_valid = await assert_hybrid_match(
         actual_output=response.metadata["explanation"],
         keywords=["apply", "mortgage", "product"],
-        semantic_meaning="The reasoning explains that the user is expressing a clear desire to acquire or apply for a mortgage product."
+        semantic_meaning="The reasoning explains that the user is expressing a clear desire to acquire or apply for a mortgage product.",
     )
     assert is_valid, "AI failed to justify its product acquisition routing."
 
@@ -56,7 +61,9 @@ async def test_intent_product_acquisition(intent_agent):
 @pytest.mark.asyncio
 async def test_intent_account_data(intent_agent):
     """Scenario 2: User is asking for specific, numerical personal data."""
-    input_data = {"message": "Can you show me my transaction history and current balance?"}
+    input_data = {
+        "message": "Can you show me my transaction history and current balance?"
+    }
     response = await intent_agent.process(input_data)
 
     assert response.metadata["intent"] == "account_data"
@@ -66,7 +73,9 @@ async def test_intent_account_data(intent_agent):
 @pytest.mark.asyncio
 async def test_intent_knowledge_inquiry(intent_agent):
     """Scenario 3: The Boundary Test. Mentioning a product, but asking about RULES, not buying."""
-    input_data = {"message": "What is the penalty fee if I withdraw early from a Fixed Rate Bond?"}
+    input_data = {
+        "message": "What is the penalty fee if I withdraw early from a Fixed Rate Bond?"
+    }
     response = await intent_agent.process(input_data)
 
     # This is the ultimate test of the Few-Shot Prompt. It must NOT route to product_acquisition.
@@ -77,7 +86,9 @@ async def test_intent_knowledge_inquiry(intent_agent):
 @pytest.mark.asyncio
 async def test_intent_complaint_urgent(intent_agent):
     """Scenario 4: High-stress emergency that requires human intervention."""
-    input_data = {"message": "My wallet was stolen and there are fraudulent charges on my credit card!"}
+    input_data = {
+        "message": "My wallet was stolen and there are fraudulent charges on my credit card!"
+    }
     response = await intent_agent.process(input_data)
 
     assert response.metadata["intent"] == "complaint"
@@ -105,7 +116,7 @@ async def test_context_aware_routing(intent_agent):
     context = {
         "conversation_history": [
             {"role": "user", "content": "I want to apply for a mortgage."},
-            {"role": "assistant", "content": "I can help with that application."}
+            {"role": "assistant", "content": "I can help with that application."},
         ]
     }
 
@@ -120,7 +131,7 @@ async def test_context_aware_routing(intent_agent):
 @pytest.mark.asyncio
 async def test_graceful_error_fallback(intent_agent):
     """Scenario 7: Frontend sends invalid/empty data."""
-    input_data = {"message": ""} # Missing required text
+    input_data = {"message": ""}  # Missing required text
 
     response = await intent_agent.process(input_data)
 

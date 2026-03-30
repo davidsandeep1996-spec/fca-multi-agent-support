@@ -18,12 +18,23 @@ from app.agents.base import BaseAgent, AgentConfig, AgentResponse
 # ENTERPRISE SCHEMAS
 # ============================================================================
 
+
 class ComplianceAnalysis(BaseModel):
     """Strict schema for FCA compliance evaluation."""
-    is_compliant: bool = Field(description="True if the content strictly adheres to FCA principles.")
-    issues: List[str] = Field(description="List of specific compliance violations. Empty if none.")
-    warnings: List[str] = Field(description="List of potential warnings or borderline issues.")
-    suggestions: str = Field(description="Suggestions to improve compliance or clarity.")
+
+    is_compliant: bool = Field(
+        description="True if the content strictly adheres to FCA principles."
+    )
+    issues: List[str] = Field(
+        description="List of specific compliance violations. Empty if none."
+    )
+    warnings: List[str] = Field(
+        description="List of potential warnings or borderline issues."
+    )
+    suggestions: str = Field(
+        description="Suggestions to improve compliance or clarity."
+    )
+
 
 class ComplianceCheckerAgent(BaseAgent):
     """
@@ -37,8 +48,14 @@ class ComplianceCheckerAgent(BaseAgent):
 
     COMPLIANCE_RULES = {
         "prohibited_words": [
-            "guaranteed", "risk-free", "no risk", "can't lose",
-            "zero risk", "100% safe", "definitely", "promise",
+            "guaranteed",
+            "risk-free",
+            "no risk",
+            "can't lose",
+            "zero risk",
+            "100% safe",
+            "definitely",
+            "promise",
         ],
         "required_disclaimers": {
             "investment": "Investments can go down as well as up",
@@ -47,7 +64,12 @@ class ComplianceCheckerAgent(BaseAgent):
             "savings": "Interest rates are variable and subject to change",
         },
         "sensitive_topics": [
-            "debt", "bankruptcy", "foreclosure", "repossession", "default", "arrears",
+            "debt",
+            "bankruptcy",
+            "foreclosure",
+            "repossession",
+            "default",
+            "arrears",
         ],
         "mandatory_warnings": {
             "high_risk": "This product carries significant risk",
@@ -90,10 +112,15 @@ class ComplianceCheckerAgent(BaseAgent):
             "Regulatory guidance",
         ]
 
-    def _filter_contextual_false_positives(self, content_lower: str, issues: List[str]) -> List[str]:
+    def _filter_contextual_false_positives(
+        self, content_lower: str, issues: List[str]
+    ) -> List[str]:
         filtered = []
         for issue in issues:
-            if "guaranteed" in issue and ("not guaranteed" in content_lower or "no loan is guaranteed" in content_lower):
+            if "guaranteed" in issue and (
+                "not guaranteed" in content_lower
+                or "no loan is guaranteed" in content_lower
+            ):
                 continue
             filtered.append(issue)
         return filtered
@@ -103,7 +130,9 @@ class ComplianceCheckerAgent(BaseAgent):
     # ========================================================================
 
     @observe(name="ComplianceChecker")
-    async def process(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentResponse:
+    async def process(
+        self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None
+    ) -> AgentResponse:
         self.log_request(input_data)
 
         # ENTERPRISE FIX: Move EVERYTHING into the try block to prevent 500 crashes
@@ -150,7 +179,7 @@ class ComplianceCheckerAgent(BaseAgent):
                     "issues": ["System validation failed"],
                     "warnings": [],
                     "suggestions": "",
-                    "required_disclaimers": []
+                    "required_disclaimers": [],
                 },
                 confidence=0.0,
             )
@@ -159,7 +188,9 @@ class ComplianceCheckerAgent(BaseAgent):
     # COMPLIANCE CHECKING LOGIC (SHORT-CIRCUIT UPGRADE)
     # ========================================================================
 
-    async def _check_compliance(self, content: str, product_type: str) -> Dict[str, Any]:
+    async def _check_compliance(
+        self, content: str, product_type: str
+    ) -> Dict[str, Any]:
         """Hybrid Short-Circuit Logic: Fast rules first, LLM second."""
 
         # 1. FAST HEURISTIC CHECK (Zero Cost, 1ms latency)
@@ -170,10 +201,14 @@ class ComplianceCheckerAgent(BaseAgent):
             return {
                 "is_compliant": False,
                 "issues": rule_issues,
-                "warnings": ["Fast keyword heuristic triggered. LLM check bypassed to save time/cost."],
+                "warnings": [
+                    "Fast keyword heuristic triggered. LLM check bypassed to save time/cost."
+                ],
                 "suggestions": "Remove prohibited words before requesting a full review.",
-                "required_disclaimers": self._get_required_disclaimers(content, product_type),
-                "confidence": 0.99  # 99% confident because it's a hard-coded strict rule
+                "required_disclaimers": self._get_required_disclaimers(
+                    content, product_type
+                ),
+                "confidence": 0.99,  # 99% confident because it's a hard-coded strict rule
             }
 
         # 2. DEEP SEMANTIC CHECK (Only runs if the text passed the fast heuristics)
@@ -185,7 +220,9 @@ class ComplianceCheckerAgent(BaseAgent):
             "issues": llm_result["issues"],
             "warnings": llm_result["warnings"],
             "suggestions": llm_result["suggestions"],
-            "required_disclaimers": self._get_required_disclaimers(content, product_type),
+            "required_disclaimers": self._get_required_disclaimers(
+                content, product_type
+            ),
             "confidence": 0.95 if is_compliant else 0.85,
         }
 
@@ -194,17 +231,24 @@ class ComplianceCheckerAgent(BaseAgent):
         content_lower = content.lower()
         for word in self.COMPLIANCE_RULES["prohibited_words"]:
             if word in content_lower:
-                issues.append(f"Prohibited language detected: '{word}'. FCA requires balanced, not misleading information.")
+                issues.append(
+                    f"Prohibited language detected: '{word}'. FCA requires balanced, not misleading information."
+                )
         return self._filter_contextual_false_positives(content_lower, issues)
 
     @observe(as_type="generation", name="Groq-Compliance-Check")
-    async def _llm_compliance_check(self, content: str, product_type: str) -> Dict[str, Any]:
+    async def _llm_compliance_check(
+        self, content: str, product_type: str
+    ) -> Dict[str, Any]:
         langfuse = get_client()
-        langfuse.update_current_generation(model=self.config.model_name, model_parameters={"temperature": 0.1})
+        langfuse.update_current_generation(
+            model=self.config.model_name, model_parameters={"temperature": 0.1}
+        )
 
         prompt = self._build_compliance_prompt(content, product_type)
 
         try:
+
             async def _call_llm():
                 return await self.client.chat.completions.create(
                     model=self.config.model_name,
@@ -214,12 +258,12 @@ class ComplianceCheckerAgent(BaseAgent):
                     ],
                     temperature=0.1,
                     max_tokens=self.config.max_tokens,
-                    response_format={"type": "json_object"}
+                    response_format={"type": "json_object"},
                 )
 
             response = await self.execute_with_retry(_call_llm)
 
-            if hasattr(response, 'usage') and response.usage:
+            if hasattr(response, "usage") and response.usage:
                 langfuse.update_current_generation(
                     usage_details={
                         "prompt_tokens": response.usage.prompt_tokens,
@@ -228,7 +272,9 @@ class ComplianceCheckerAgent(BaseAgent):
                     }
                 )
 
-            analysis = ComplianceAnalysis.model_validate_json(response.choices[0].message.content)
+            analysis = ComplianceAnalysis.model_validate_json(
+                response.choices[0].message.content
+            )
             return analysis.model_dump()
 
         except Exception as e:
@@ -237,7 +283,7 @@ class ComplianceCheckerAgent(BaseAgent):
                 "is_compliant": False,
                 "issues": ["LLM Validation Failed. Requires manual review."],
                 "warnings": [],
-                "suggestions": "Check system logs."
+                "suggestions": "Check system logs.",
             }
 
     def _build_compliance_prompt(self, content: str, product_type: str) -> str:
@@ -305,15 +351,23 @@ Be thorough and strict - compliance violations can result in significant penalti
                 disclaimers.append(disclaimer)
 
         if any(word in content_lower for word in ["invest", "return", "profit"]):
-            disclaimers.append(self.COMPLIANCE_RULES["required_disclaimers"]["investment"])
+            disclaimers.append(
+                self.COMPLIANCE_RULES["required_disclaimers"]["investment"]
+            )
 
         if any(word in content_lower for word in ["loan", "borrow", "mortgage"]):
             disclaimers.append(self.COMPLIANCE_RULES["required_disclaimers"]["loan"])
 
-        if any(word in content_lower for word in ["credit card", "apr", "credit limit", "overdraft"]):
+        if any(
+            word in content_lower
+            for word in ["credit card", "apr", "credit limit", "overdraft"]
+        ):
             disclaimers.append(self.COMPLIANCE_RULES["required_disclaimers"]["credit"])
 
-        if any(word in content_lower for word in ["savings", "bond", "deposit", "interest rate"]):
+        if any(
+            word in content_lower
+            for word in ["savings", "bond", "deposit", "interest rate"]
+        ):
             disclaimers.append(self.COMPLIANCE_RULES["required_disclaimers"]["savings"])
 
         for topic in self.COMPLIANCE_RULES["sensitive_topics"]:
