@@ -78,7 +78,7 @@ jobs:
 
       - name: Lint with Ruff
         run: |
-          ruff check .
+          ruff check . --fix
           ruff format --check .
 
       - name: Type check with mypy
@@ -112,6 +112,9 @@ jobs:
 
           # 2. Run your data seeder
           python -m app.seed_database
+
+          # 3. 📄 INGEST THE RAG PDF
+          python ingest.py
 
       - name: 🧪 Run Agent & Worker Tests (Batch 1)
         env:
