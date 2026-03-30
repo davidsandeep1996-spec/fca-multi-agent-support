@@ -11,6 +11,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("langfuse").setLevel(logging.WARNING)
 logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
+
 @pytest.fixture
 async def general_agent():
     """True Enterprise Integration Fixture using the REAL Database Services."""
@@ -19,7 +20,9 @@ async def general_agent():
     from app.config import settings
 
     # 1. Connect to the real test database
-    test_engine = create_async_engine(settings.database_url, poolclass=NullPool, echo=False)
+    test_engine = create_async_engine(
+        settings.database_url, poolclass=NullPool, echo=False
+    )
     session = AsyncSession(bind=test_engine, expire_on_commit=False)
 
     try:
@@ -28,15 +31,12 @@ async def general_agent():
         rag_svc = RAGService()
 
         config = AgentConfig()
-        agent = GeneralAgent(
-            config=config,
-            faq_service=faq_svc,
-            rag_service=rag_svc
-        )
+        agent = GeneralAgent(config=config, faq_service=faq_svc, rag_service=rag_svc)
         yield agent
     finally:
         await session.close()
         await test_engine.dispose()
+
 
 @pytest.mark.asyncio
 async def test_real_faq_tier1_fast_path(general_agent):
@@ -53,6 +53,7 @@ async def test_real_faq_tier1_fast_path(general_agent):
     # 2. Assert it pulled the real data ("fee-free banking")
     assert "fee-free banking" in response.content.lower()
     assert "no monthly account fees" in response.content.lower()
+
 
 @pytest.mark.asyncio
 async def test_real_rag_tier2_document_lookup(general_agent):
@@ -72,14 +73,17 @@ async def test_real_rag_tier2_document_lookup(general_agent):
     is_valid = await assert_hybrid_match(
         actual_output=response.content,
         keywords=["freeze", "app", "hotline", "fraud"],
-        semantic_meaning="The AI advises the user to freeze their card in the app and contact the 24/7 fraud hotline based on the PDF document."
+        semantic_meaning="The AI advises the user to freeze their card in the app and contact the 24/7 fraud hotline based on the PDF document.",
     )
     assert is_valid, "AI failed to synthesize the real RAG document correctly."
+
 
 @pytest.mark.asyncio
 async def test_real_rag_accessibility_query(general_agent):
     """Scenario 3: Tests another specific RAG vector search from the PDF."""
-    input_data = {"message": "Do you offer services for customers with visual impairments?"}
+    input_data = {
+        "message": "Do you offer services for customers with visual impairments?"
+    }
 
     response = await general_agent.process(input_data)
 
@@ -89,9 +93,10 @@ async def test_real_rag_accessibility_query(general_agent):
     is_valid = await assert_hybrid_match(
         actual_output=response.content,
         keywords=["braille", "audio", "large print", "screen readers"],
-        semantic_meaning="The AI confirms support for screen readers and offers Braille, large print, or audio formats."
+        semantic_meaning="The AI confirms support for screen readers and offers Braille, large print, or audio formats.",
     )
     assert is_valid, "AI failed to extract accessibility info from the vector DB."
+
 
 @pytest.mark.asyncio
 async def test_privacy_token_handling(general_agent):
@@ -106,9 +111,10 @@ async def test_privacy_token_handling(general_agent):
     is_valid = await assert_hybrid_match(
         actual_output=response.content,
         keywords=["details", "information", "safely"],
-        semantic_meaning="The AI politely acknowledges receiving the user's information without repeating the specific PII tokens."
+        semantic_meaning="The AI politely acknowledges receiving the user's information without repeating the specific PII tokens.",
     )
     assert is_valid, "AI violated the PII masking protocol."
+
 
 @pytest.mark.asyncio
 async def test_conversational_memory(general_agent):
@@ -117,7 +123,10 @@ async def test_conversational_memory(general_agent):
     context = {
         "conversation_history": [
             {"role": "user", "content": "I want to apply for a fixed 5-year mortgage."},
-            {"role": "assistant", "content": "I can help you with our mortgage products."}
+            {
+                "role": "assistant",
+                "content": "I can help you with our mortgage products.",
+            },
         ]
     }
 
@@ -126,9 +135,10 @@ async def test_conversational_memory(general_agent):
     is_valid = await assert_hybrid_match(
         actual_output=response.content,
         keywords=["mortgage", "fixed", "5-year"],
-        semantic_meaning="The AI accurately recalls that the user was just asking about a fixed 5-year mortgage."
+        semantic_meaning="The AI accurately recalls that the user was just asking about a fixed 5-year mortgage.",
     )
     assert is_valid, "AI failed to utilize conversation memory."
+
 
 @pytest.mark.asyncio
 async def test_out_of_domain_fallback(general_agent):
@@ -143,6 +153,8 @@ async def test_out_of_domain_fallback(general_agent):
     is_valid = await assert_hybrid_match(
         actual_output=response.content,
         keywords=["information", "topic"],
-        semantic_meaning="The AI politely explains it does not have the information to answer the question, refusing to hallucinate a cake recipe."
+        semantic_meaning="The AI politely explains it does not have the information to answer the question, refusing to hallucinate a cake recipe.",
     )
-    assert is_valid, "AI hallucinated cake recipes instead of safely refusing based on the context."
+    assert is_valid, (
+        "AI hallucinated cake recipes instead of safely refusing based on the context."
+    )

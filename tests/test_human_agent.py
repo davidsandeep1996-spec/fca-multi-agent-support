@@ -9,6 +9,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("langfuse").setLevel(logging.WARNING)
 logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
+
 @pytest.fixture
 async def human_agent():
     """True Enterprise Integration Fixture using REAL Postgres Database."""
@@ -17,7 +18,9 @@ async def human_agent():
     from app.config import settings
 
     # 1. Connect to the real test database
-    test_engine = create_async_engine(settings.database_url, poolclass=NullPool, echo=False)
+    test_engine = create_async_engine(
+        settings.database_url, poolclass=NullPool, echo=False
+    )
     session = AsyncSession(bind=test_engine, expire_on_commit=False)
 
     try:
@@ -25,10 +28,7 @@ async def human_agent():
         conv_svc = ConversationService(db=session)
         config = AgentConfig()
 
-        agent = HumanAgent(
-            config=config,
-            conversation_service=conv_svc
-        )
+        agent = HumanAgent(config=config, conversation_service=conv_svc)
         yield agent
     finally:
         await session.close()
@@ -41,7 +41,7 @@ async def test_urgent_fraud_fast_path(human_agent):
     input_data = {
         "message": "My card was stolen and there are unauthorized fraud charges on my account!",
         "customer_id": 9991,
-        "conversation_id": 8881
+        "conversation_id": 8881,
     }
 
     response = await human_agent.process(input_data)
@@ -64,7 +64,7 @@ async def test_semantic_high_priority_llm(human_agent):
     input_data = {
         "message": "Your system crashed while I was transferring money and now I am missing funds. This is completely unacceptable service and I demand a manager.",
         "customer_id": 9992,
-        "conversation_id": 8882
+        "conversation_id": 8882,
     }
 
     response = await human_agent.process(input_data)
@@ -82,7 +82,7 @@ async def test_semantic_medium_priority_llm(human_agent):
     input_data = {
         "message": "I'm having a little trouble updating my address in the app. Can a human agent help me?",
         "customer_id": 9993,
-        "conversation_id": 8883
+        "conversation_id": 8883,
     }
 
     response = await human_agent.process(input_data)
@@ -120,7 +120,7 @@ async def test_real_db_outage_fallback(human_agent):
     input_data = {
         "message": "I need to file a formal complaint right now.",
         "customer_id": 9994,
-        "conversation_id": 8884
+        "conversation_id": 8884,
     }
 
     # Even though the DB is down, the app MUST NOT crash with a 500 error!
