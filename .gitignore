@@ -135,9 +135,9 @@ test_coordinator.py
 test_customer.py
 test_db_smoke.py
 test_doc.txt
-test_general_agent.py
+test_general_agent1.py
 test_health.py
-test_human_agent.py
+test_human_agent1.py
 test_integration.py
 test_intent.py
 test_product_recommender.py
