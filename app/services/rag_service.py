@@ -36,6 +36,8 @@ class RAGService:
         # The model from your snippet
         self.model_name = "sentence-transformers/all-MiniLM-L6-v2"
 
+        self.logger = logging.getLogger(__name__)
+
         # 2. Initialize the client dynamically
         # It will automatically pick up the HF_TOKEN from your environment variables
         self.client = AsyncInferenceClient(token=os.environ.get("HF_TOKEN"))
