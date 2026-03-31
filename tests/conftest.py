@@ -5,8 +5,12 @@ import os
 from sqlalchemy import text
 from app.database import engine, Base
 from dotenv import load_dotenv
-load_dotenv()
 import pytest_asyncio
+import redis.asyncio as redis
+
+
+load_dotenv()
+
 os.environ["REDIS_URL"] = "redis://localhost:6379/1"
 
 
@@ -58,13 +62,28 @@ async def enterprise_database_setup():
         await engine.dispose()
 
 
+
+
 @pytest_asyncio.fixture(scope="function", autouse=True)
-async def nuke_redis_cache(general_agent):
+async def nuke_redis_cache():
     """
-    Runs BEFORE every single test to guarantee a completely empty cache.
+    Enterprise Global Redis Teardown.
+    Runs before EVERY test across the entire project, ensuring zero state leakage.
+    Does not depend on localized agent fixtures.
     """
-    if hasattr(general_agent, "cache_service") and hasattr(general_agent.cache_service, "redis_client"):
-        # Ruthlessly wipe the current Redis logical database
-        await general_agent.cache_service.redis_client.flushdb()
+    # 1. Grab the URL directly from the environment (defaulting to DB 1 for safety)
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/1")
+
+    # 2. Connect directly to the database
+    client = redis.from_url(redis_url, decode_responses=True)
+
+    try:
+        # 3. Ruthlessly wipe the current logical database
+        await client.flushdb()
+    except Exception as e:
+        print(f"\n[⚠️ REDIS WARNING] Could not flush cache: {e}")
+    finally:
+        # 4. Close the connection so we don't leak connection pool resources in CI
+        await client.aclose()
 
     yield # Execute the test in a completely clean state

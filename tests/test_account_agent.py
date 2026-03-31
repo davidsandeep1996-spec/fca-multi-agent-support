@@ -3,7 +3,7 @@ import logging
 from app.agents.account_agent import AccountAgent
 from app.agents.base import AgentConfig
 from app.services import AccountService, CustomerService, TransactionService
-from tests.integration.test_product_agent import assert_hybrid_match
+from tests.test_product_agent import assert_hybrid_match
 
 # Silence noise
 logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)

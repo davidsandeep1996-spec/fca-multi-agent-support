@@ -3,7 +3,7 @@ import logging
 from app.agents.intent_classifier import IntentClassifierAgent
 from app.agents.base import AgentConfig
 from app.services import ProductService
-from tests.integration.test_product_agent import assert_hybrid_match
+from tests.test_product_agent import assert_hybrid_match
 
 # Silence external API logs to keep the test output clean
 logging.getLogger("httpx").setLevel(logging.WARNING)
