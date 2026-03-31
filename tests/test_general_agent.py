@@ -7,6 +7,7 @@ from app.services.rag_service import RAGService
 from app.services.cache_service import CacheService
 from tests.test_product_agent import assert_hybrid_match
 from unittest.mock import patch, AsyncMock
+
 # Silence external logs
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("langfuse").setLevel(logging.WARNING)
@@ -42,7 +43,7 @@ async def general_agent():
             config=config,
             faq_service=faq_svc,
             rag_service=rag_svc,
-            cache_service=cache_svc
+            cache_service=cache_svc,
         )
         yield agent
     finally:
@@ -56,14 +57,18 @@ async def test_real_faq_tier1_fast_path(general_agent):
 
     # ENTERPRISE FIX: Force a cache miss to ensure we hit the FAQ DB.
     # We mock the cache retrieval to return None just for this test.
-    with patch.object(general_agent.cache_service, 'get_cached_response', new_callable=AsyncMock) as mock_cache:
+    with patch.object(
+        general_agent.cache_service, "get_cached_response", new_callable=AsyncMock
+    ) as mock_cache:
         mock_cache.return_value = None
 
         input_data = {"message": "What are your account fees?"}
         response = await general_agent.process(input_data)
 
         # 1. Assert it hit the real FAQ database and bypassed the LLM
-        assert response.metadata["source"] == "faq_db", f"Expected faq_db, got {response.metadata.get('source')}"
+        assert response.metadata["source"] == "faq_db", (
+            f"Expected faq_db, got {response.metadata.get('source')}"
+        )
 
 
 @pytest.mark.asyncio
@@ -121,7 +126,10 @@ async def test_conversational_memory(general_agent):
     context = {
         "conversation_history": [
             {"role": "user", "content": "I want to apply for a fixed 5-year mortgage."},
-            {"role": "assistant", "content": "I can help you with our mortgage products."},
+            {
+                "role": "assistant",
+                "content": "I can help you with our mortgage products.",
+            },
         ]
     }
 
@@ -145,7 +153,7 @@ async def test_out_of_domain_fallback(general_agent):
     # safe fallbacks (e.g., "I don't have information on that topic").
     is_valid = await assert_hybrid_match(
         actual_output=response.content,
-        keywords=[], # Removed strict banking keywords
+        keywords=[],  # Removed strict banking keywords
         semantic_meaning="The AI politely states that it does not have information on that topic.",
     )
     assert is_valid, f"AI failed safe refusal check. Actual output: {response.content}"
@@ -158,12 +166,12 @@ async def test_redis_semantic_caching(general_agent):
     # First Query: This forces the agent to hit the FAQ DB and warm up the Redis Cache
     input_data = {"message": "What is the process to open a new joint account?"}
 
-    if general_agent.cache_service :
+    if general_agent.cache_service:
         # We manually inject a cached response directly into Redis to simulate a prior hit
         await general_agent.cache_service.set_cached_response(
             "What is the process to open a new joint account?",
             "This is a mocked lightning-fast cached response from Redis!",
-            ttl_seconds=60
+            ttl_seconds=60,
         )
 
     # Second Query: Same exact message. It should get trapped at Tier 0.
@@ -171,5 +179,8 @@ async def test_redis_semantic_caching(general_agent):
 
     # Assertions: Verify it returned the cached string, and verify the source metadata
     assert response.metadata["source"] == "redis_cache"
-    assert response.content == "This is a mocked lightning-fast cached response from Redis!"
+    assert (
+        response.content
+        == "This is a mocked lightning-fast cached response from Redis!"
+    )
     assert response.confidence == 1.0

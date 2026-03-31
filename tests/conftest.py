@@ -62,8 +62,6 @@ async def enterprise_database_setup():
         await engine.dispose()
 
 
-
-
 @pytest_asyncio.fixture(scope="function", autouse=True)
 async def nuke_redis_cache():
     """
@@ -86,4 +84,4 @@ async def nuke_redis_cache():
         # 4. Close the connection so we don't leak connection pool resources in CI
         await client.aclose()
 
-    yield # Execute the test in a completely clean state
+    yield  # Execute the test in a completely clean state
