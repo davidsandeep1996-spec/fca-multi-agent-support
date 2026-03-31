@@ -7,6 +7,7 @@ from app.database import engine, Base
 from dotenv import load_dotenv
 import pytest_asyncio
 import redis.asyncio as redis
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 load_dotenv()
@@ -85,3 +86,12 @@ async def nuke_redis_cache():
         await client.aclose()
 
     yield  # Execute the test in a completely clean state
+
+
+@pytest_asyncio.fixture(scope="function")
+async def db_session():
+    """Provides an isolated database session for a single test."""
+    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+        yield session
+        # Optionally rollback after the test to keep the DB perfectly clean
+        await session.rollback()

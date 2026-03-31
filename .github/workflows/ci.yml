@@ -130,7 +130,7 @@ jobs:
           # Runs lightweight agent logic tests first
           pytest tests/test_account_agent.py tests/test_general_agent.py tests/test_human_agent.py tests/test_product_agent.py -v --tb=short --disable-warnings --cov=app --cov-append --cov-report=term-missing --cov-report=xml
 
-      - name: 🧠 Run Heavy ML Classifiers (Batch 2)
+      - name: Run Classifier (Batch 2)
         env:
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
           REDIS_URL: redis://localhost:6379/1
