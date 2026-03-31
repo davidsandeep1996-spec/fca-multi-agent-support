@@ -95,6 +95,7 @@ jobs:
           # Inject the connection string so your script knows where to insert the data
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          REDIS_URL: redis://localhost:6379/1
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
 
         run: |
@@ -120,7 +121,7 @@ jobs:
       - name: 🧪 Run Agent & Worker Tests (Batch 1)
         env:
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
-          REDIS_URL: redis://localhost:6379/0
+          REDIS_URL: redis://localhost:6379/1
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           SECRET_KEY: super-secret-test-key-that-is-at-least-32-chars
@@ -132,7 +133,7 @@ jobs:
       - name: 🧠 Run Heavy ML Classifiers (Batch 2)
         env:
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
-          REDIS_URL: redis://localhost:6379/0
+          REDIS_URL: redis://localhost:6379/1
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           SECRET_KEY: super-secret-test-key-that-is-at-least-32-chars
@@ -149,7 +150,7 @@ jobs:
       - name: 🏗️ Run E2E Coordinator Integration (Part 1)
         env:
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
-          REDIS_URL: redis://localhost:6379/0
+          REDIS_URL: redis://localhost:6379/1
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           SECRET_KEY: super-secret-test-key-that-is-at-least-32-chars
@@ -160,7 +161,7 @@ jobs:
       - name: 🏗️ Run E2E Coordinator Integration (Part 2)
         env:
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
-          REDIS_URL: redis://localhost:6379/0
+          REDIS_URL: redis://localhost:6379/1
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           SECRET_KEY: super-secret-test-key-that-is-at-least-32-chars
@@ -172,7 +173,7 @@ jobs:
       - name: 🏗️ Run E2E Coordinator Integration (Part 3)
         env:
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
-          REDIS_URL: redis://localhost:6379/0
+          REDIS_URL: redis://localhost:6379/1
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           SECRET_KEY: super-secret-test-key-that-is-at-least-32-chars
@@ -185,7 +186,7 @@ jobs:
       - name: 🏗️ Run Full workflow (Part 1)
         env:
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
-          REDIS_URL: redis://localhost:6379/0
+          REDIS_URL: redis://localhost:6379/1
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           SECRET_KEY: super-secret-test-key-that-is-at-least-32-chars
@@ -197,7 +198,7 @@ jobs:
       - name: 🏗️ Run Full workflow (Part 2)
         env:
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
-          REDIS_URL: redis://localhost:6379/0
+          REDIS_URL: redis://localhost:6379/1
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           SECRET_KEY: super-secret-test-key-that-is-at-least-32-chars
@@ -209,7 +210,7 @@ jobs:
       - name: 🏗️ Run Rag
         env:
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
-          REDIS_URL: redis://localhost:6379/0
+          REDIS_URL: redis://localhost:6379/1
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           SECRET_KEY: super-secret-test-key-that-is-at-least-32-chars

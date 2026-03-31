@@ -4,6 +4,10 @@ import sys
 import os
 from sqlalchemy import text
 from app.database import engine, Base
+from dotenv import load_dotenv
+load_dotenv()
+import pytest_asyncio
+os.environ["REDIS_URL"] = "redis://localhost:6379/1"
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -52,3 +56,15 @@ async def enterprise_database_setup():
 
     finally:
         await engine.dispose()
+
+
+@pytest_asyncio.fixture(scope="function", autouse=True)
+async def nuke_redis_cache(general_agent):
+    """
+    Runs BEFORE every single test to guarantee a completely empty cache.
+    """
+    if hasattr(general_agent, "cache_service") and hasattr(general_agent.cache_service, "redis_client"):
+        # Ruthlessly wipe the current Redis logical database
+        await general_agent.cache_service.redis_client.flushdb()
+
+    yield # Execute the test in a completely clean state

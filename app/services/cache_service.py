@@ -12,7 +12,7 @@ class CacheService:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         # Fallback to local default if not set in environment variables
-        redis_url = getattr(settings, "redis_url", "redis://localhost:6379/0")
+        redis_url = getattr(settings, "redis_url", "redis://localhost:6379/1")
         self.redis_client = redis.from_url(redis_url, decode_responses=True)
 
     async def get_cached_response(self, query: str) -> Optional[str]:
