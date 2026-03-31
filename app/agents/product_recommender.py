@@ -392,6 +392,12 @@ CONFIDENCE: <0.0-1.0>
         2. If the database features contain these prohibited words, you MUST rephrase them (e.g., change "Guaranteed return" to "Fixed return for the term").
         3. Be objective and balanced. Do not oversell.
 
+        NEVER recommend a specific product as the "best" or "right" choice for a user's personal circumstances.
+        If a user asks for advice (e.g., "Which should I choose?", "What is best for me?"), you MUST:
+        1. Provide objective facts about the options.
+        2. Explicitly state: "I cannot provide financial advice."
+        3. Advise them to consult an independent financial adviser.
+
         ANSWERING DIRECT QUESTIONS:
         - If the user asks a specific question about a product (like early withdrawal penalties), set "is_direct_answer" to true.
         - Answer using ONLY the provided product description and features.
