@@ -1,0 +1,35 @@
+name: Continuous Deployment to OCI
+
+on:
+  push:
+    branches: [ main ]  # This triggers the deploy every time you push to main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Oracle Cloud via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USERNAME }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          script: |
+            # 1. Navigate to app directory or clone if first time
+            if [ ! -d "fca-app" ]; then
+              git clone https://github.com/${{ github.repository }}.git fca-app
+            fi
+            cd fca-app
+
+            # 2. Pull the latest changes
+            git pull origin main
+
+            # 3. Deploy using Docker Compose
+            docker compose down
+            docker compose up -d --build
+
+            # 4. Clean up old Docker data to save 1GB RAM space
+            docker system prune -f
