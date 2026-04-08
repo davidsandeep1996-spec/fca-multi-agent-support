@@ -29,7 +29,13 @@ jobs:
 
             # 3. Deploy using Docker Compose
             docker compose down
-            docker compose up -d --build
+            
+            # Start DB and Redis first and wait
+            docker compose up -d db redis
+            sleep 10
 
-            # 4. Clean up old Docker data to save 1GB RAM space
+            # Start the rest
+            docker compose up -d web worker frontend
+
+            # Prune to save disk space
             docker system prune -f

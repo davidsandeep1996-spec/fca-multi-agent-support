@@ -56,6 +56,11 @@ services:
     ports:
       - "8000:8000"
 
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
 
     environment:
 
@@ -116,6 +121,10 @@ services:
       dockerfile: Dockerfile
     container_name: fca-worker
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     environment:
       # Needs same DB/Redis config as web
       DATABASE_URL: postgresql+asyncpg://fca_user:fca_password@db:5432/fca_support
