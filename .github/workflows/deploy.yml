@@ -2,40 +2,55 @@ name: Continuous Deployment to OCI
 
 on:
   push:
-    branches: [ main ]  # This triggers the deploy every time you push to main
+    branches: [ main ]
 
 jobs:
-  deploy:
+  build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Log in to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build and Push Web Image
+        run: |
+          docker build -t ghcr.io/davidsandeep1996-spec/fca-multi-agent-support/fca-app:latest .
+          docker push ghcr.io/davidsandeep1996-spec/fca-multi-agent-support/fca-app:latest
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
       - name: Deploy to Oracle Cloud via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USERNAME }}
           key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 30m
           script: |
-            # 1. Navigate to app directory or clone if first time
-            if [ ! -d "fca-app" ]; then
-              git clone https://github.com/${{ github.repository }}.git fca-app
-            fi
             cd fca-app
-
-            # 2. Pull the latest changes
             git pull origin main
 
-            # 3. Deploy using Docker Compose
+            # Ensure Docker is running and log into GHCR
+            sudo systemctl start docker
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u davidsandeep1996-spec --password-stdin
+
+            # Shut down old app and clean up memory
             docker compose down
-            
-            # Start DB and Redis first and wait
+            docker system prune -af
+
+            # PULL the pre-built image instead of building it
+            docker compose pull
+
+            # Start DB and Redis first
             docker compose up -d db redis
             sleep 10
 
-            # Start the rest
+            # Start the application using the pulled image
             docker compose up -d web worker frontend
-
-            # Prune to save disk space
-            docker system prune -f

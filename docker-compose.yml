@@ -48,10 +48,11 @@ services:
 
   # FastAPI Application
   web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: fca-app
+    #build:
+    #  context: .
+    #  dockerfile: Dockerfile
+    image: ghcr.io/davidsandeep1996-spec/fca-multi-agent-support/fca-app:latest
+    container_name: fca-app-web
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -116,10 +117,12 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
   # [CHANGE 1c] Add Background Worker Service
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: fca-worker
+    #build:
+    #  context: .
+    #  dockerfile: Dockerfile
+    # ADD THIS LINE INSTEAD:
+    image: ghcr.io/davidsandeep1996-spec/fca-multi-agent-support/fca-app:latest
+    container_name: fca-app-worker
     restart: unless-stopped
     deploy:
       resources:
@@ -145,9 +148,10 @@ services:
 
     # [CHANGE 2a] Add Frontend Service
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    #build:
+    #  context: ./frontend
+    #  dockerfile: Dockerfile
+    image: ghcr.io/davidsandeep1996-spec/fca-multi-agent-support/fca-frontend:latest
     container_name: fca-frontend
     restart: unless-stopped
     ports:
