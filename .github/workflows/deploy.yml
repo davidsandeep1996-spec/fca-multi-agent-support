@@ -22,6 +22,11 @@ jobs:
           docker build -t ghcr.io/davidsandeep1996-spec/fca-multi-agent-support/fca-app:latest .
           docker push ghcr.io/davidsandeep1996-spec/fca-multi-agent-support/fca-app:latest
 
+      - name: Build and Push Frontend Image
+        run: |
+          docker build -t ghcr.io/davidsandeep1996-spec/fca-multi-agent-support/fca-frontend:latest ./frontend
+          docker push ghcr.io/davidsandeep1996-spec/fca-multi-agent-support/fca-frontend:latest
+
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
