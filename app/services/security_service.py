@@ -44,14 +44,19 @@ class SecurityService:
         # We wrap in try/except in case the Spacy model isn't downloaded locally
         try:
             if self.redact_pii:
-                self.analyzer = AnalyzerEngine(nlp_engine=nlp_engine,supported_languages=["en"])
-                        # Regex matches: 2 Letters, 6 Numbers, 1 Letter (with or without spaces)
-                nino_regex = r"(?i)\b[A-Z]{2}\s?[0-9]{2}\s?[0-9]{2}\s?[0-9]{2}\s?[A-D]\b"
-                nino_pattern = Pattern(name="uk_nino_pattern", regex=nino_regex, score=0.85)
+                self.analyzer = AnalyzerEngine(
+                    nlp_engine=nlp_engine, supported_languages=["en"]
+                )
+                # Regex matches: 2 Letters, 6 Numbers, 1 Letter (with or without spaces)
+                nino_regex = (
+                    r"(?i)\b[A-Z]{2}\s?[0-9]{2}\s?[0-9]{2}\s?[0-9]{2}\s?[A-D]\b"
+                )
+                nino_pattern = Pattern(
+                    name="uk_nino_pattern", regex=nino_regex, score=0.85
+                )
 
                 nino_recognizer = PatternRecognizer(
-                    supported_entity="UK_NINO",
-                    patterns=[nino_pattern]
+                    supported_entity="UK_NINO", patterns=[nino_pattern]
                 )
 
                 # Register the custom UK rule into the engine

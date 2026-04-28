@@ -79,7 +79,9 @@ class AccountAgent(BaseAgent):
                 return date_val
         return date_val.strftime("%d %b %Y")
 
-    def _format_history(self, context: Optional[Dict[str, Any]], max_turns: int = 5) -> str:
+    def _format_history(
+        self, context: Optional[Dict[str, Any]], max_turns: int = 5
+    ) -> str:
         """Extracts and formats recent conversation history for the LLM prompt."""
         if not context or "conversation_history" not in context:
             return ""
@@ -147,7 +149,9 @@ class AccountAgent(BaseAgent):
                 confidence=0.0,
             )
 
-    async def _determine_query_type(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
+    async def _determine_query_type(
+        self, message: str, context: Optional[Dict[str, Any]] = None
+    ) -> str:
         """Uses LLM structured output with Zero-Shot formatting to flawlessly identify user intent."""
         history_str = self._format_history(context)
         prompt = f"""
@@ -187,7 +191,10 @@ class AccountAgent(BaseAgent):
             return "general"
 
     async def _generate_conversational_response(
-        self, user_message: str, raw_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None
+        self,
+        user_message: str,
+        raw_data: Dict[str, Any],
+        context: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Feeds raw DB JSON to the LLM to generate a natural, helpful response."""
         if raw_data.get("error"):
@@ -244,13 +251,21 @@ class AccountAgent(BaseAgent):
             # 🛠️ FIX: Loop through ALL accounts and pass them to the AI
             accounts_data = []
             for acc in accounts:
-                accounts_data.append({
-                    "account_number": getattr(acc, "account_number", "N/A"),
-                    "account_type": self._friendly_account_type(getattr(acc, "type", None)),
-                    "balance": self._format_currency(float(getattr(acc, "balance", 0.0))),
-                    "status": "Active",
-                    "opened_on": self._friendly_date(getattr(acc, "created_at", None))
-                })
+                accounts_data.append(
+                    {
+                        "account_number": getattr(acc, "account_number", "N/A"),
+                        "account_type": self._friendly_account_type(
+                            getattr(acc, "type", None)
+                        ),
+                        "balance": self._format_currency(
+                            float(getattr(acc, "balance", 0.0))
+                        ),
+                        "status": "Active",
+                        "opened_on": self._friendly_date(
+                            getattr(acc, "created_at", None)
+                        ),
+                    }
+                )
 
             return {
                 "data": {"portfolio": accounts_data},

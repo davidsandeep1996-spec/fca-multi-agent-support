@@ -34,6 +34,7 @@ from app.routers.admin import router as admin_router
 from app.api.routes.auth import router as auth_router
 import asyncio
 from contextvars import ContextVar
+
 # Import routers
 from app.routers import health
 
@@ -45,7 +46,10 @@ logger = logging.getLogger(__name__)
 coordinator = AgentCoordinator()
 
 # 1. Context Variable to hold the queue for the active web request
-stream_queue_var: ContextVar[asyncio.Queue] = ContextVar("stream_queue_var", default=None)
+stream_queue_var: ContextVar[asyncio.Queue] = ContextVar(
+    "stream_queue_var", default=None
+)
+
 
 # 2. Custom handler to intercept logs and push them to the stream
 class SSELogHandler(logging.Handler):
@@ -59,6 +63,7 @@ class SSELogHandler(logging.Handler):
                 loop.call_soon_threadsafe(q.put_nowait, {"type": "log", "content": msg})
             except RuntimeError:
                 pass
+
 
 # 3. Attach interceptor to the global root logger
 logging.getLogger().addHandler(SSELogHandler())
@@ -237,38 +242,59 @@ def create_application() -> FastAPI:
             # Background Task: Run LangGraph so it doesn't block the stream
             async def run_graph():
                 try:
-                    async for event in coordinator.stream_message(message, customer_id, conversation_id):
+                    async for event in coordinator.stream_message(
+                        message, customer_id, conversation_id
+                    ):
                         # Wrap LangGraph tuples into dictionaries if necessary, or push directly
                         if isinstance(event, tuple):
                             node_name, state = event
 
                             # Stream the node status to the UI
-                            await q.put({"type": "status", "step": node_name, "content": f"Processing in {node_name}..."})
+                            await q.put(
+                                {
+                                    "type": "status",
+                                    "step": node_name,
+                                    "content": f"Processing in {node_name}...",
+                                }
+                            )
 
                             # 1. Catch Standard Agent Responses (from Node: End)
                             if "final_response" in state:
                                 final_resp = state["final_response"]
-                                await q.put({
-                                    "type": "response",
-                                    "content": final_resp.get("message", ""),
-                                    "metadata": final_resp.get("metadata", {}),
-                                    "conversation_id": conversation_id
-                                })
+                                await q.put(
+                                    {
+                                        "type": "response",
+                                        "content": final_resp.get("message", ""),
+                                        "metadata": final_resp.get("metadata", {}),
+                                        "conversation_id": conversation_id,
+                                    }
+                                )
 
                             # 2. Catch Human Agent Interruptions (Skips Node: End)
-                            elif node_name.lower() in ["human_agent", "human"] or state.get("agent_metadata", {}).get("escalated"):
+                            elif node_name.lower() in [
+                                "human_agent",
+                                "human",
+                            ] or state.get("agent_metadata", {}).get("escalated"):
                                 if "agent_response" in state:
-                                    await q.put({
-                                        "type": "response",
-                                        "content": state.get("agent_response"),
-                                        "metadata": {
-                                            "intent_confidence": state.get("confidence", 1.0),
-                                            "is_compliant": True,  # Escalations are always compliant
-                                            "escalation_id": state.get("agent_metadata", {}).get("escalation_id"),
-                                            "agent_metadata": state.get("agent_metadata", {})
-                                        },
-                                        "conversation_id": conversation_id
-                                    })
+                                    await q.put(
+                                        {
+                                            "type": "response",
+                                            "content": state.get("agent_response"),
+                                            "metadata": {
+                                                "intent_confidence": state.get(
+                                                    "confidence", 1.0
+                                                ),
+                                                "is_compliant": True,  # Escalations are always compliant
+                                                "escalation_id": state.get(
+                                                    "agent_metadata", {}
+                                                ).get("escalation_id"),
+                                                "agent_metadata": state.get(
+                                                    "agent_metadata", {}
+                                                ),
+                                            },
+                                            "conversation_id": conversation_id,
+                                        }
+                                    )
                         else:
                             await q.put(event)
                 except Exception as e:

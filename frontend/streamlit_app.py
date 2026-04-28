@@ -309,7 +309,7 @@ with st.sidebar:
     show_dev_trace = st.toggle(
         "Enable API Lifecycle Trace",
         value=True,
-        help="Show the detailed message path from FastAPI to LangGraph and back."
+        help="Show the detailed message path from FastAPI to LangGraph and back.",
     )
 
 # --- CHAT INTERFACE ---
@@ -332,7 +332,6 @@ if prompt := st.chat_input("How can I help you today?"):
 
     # Call Backend
     with st.chat_message("assistant"):
-
         # --- DYNAMIC UI SWITCH ---
         if show_dev_trace:
             status = st.status("📡 **Tracing API Lifecycle...**", expanded=True)
@@ -366,7 +365,7 @@ if prompt := st.chat_input("How can I help you today?"):
             if response.status_code == 200:
                 for line in response.iter_lines():
                     if line:
-                        decoded_line = line.decode('utf-8')
+                        decoded_line = line.decode("utf-8")
                         if decoded_line.startswith("data: "):
                             data_str = decoded_line[6:].strip()
                             if data_str == "[DONE]":
@@ -379,28 +378,47 @@ if prompt := st.chat_input("How can I help you today?"):
                                 # 1. Handle Deep System Logs
                                 if event_type == "log":
                                     if show_dev_trace:
-                                        log_str = event_data.get('content', '')
+                                        log_str = event_data.get("content", "")
 
                                         # A: Catch massive JSON traces (like Langfuse) & hide in an expander
                                         if "Full details: {" in log_str:
-                                            summary, json_payload = log_str.split("Full details: ", 1)
-                                            with status.expander(f"🧩 {summary.strip()}", expanded=False):
+                                            summary, json_payload = log_str.split(
+                                                "Full details: ", 1
+                                            )
+                                            with status.expander(
+                                                f"🧩 {summary.strip()}", expanded=False
+                                            ):
                                                 try:
                                                     st.json(json.loads(json_payload))
                                                 except:
-                                                    st.code(json_payload, language="json")
+                                                    st.code(
+                                                        json_payload, language="json"
+                                                    )
 
                                         # B: Color-code Success logs (Green)
                                         elif "✅" in log_str:
-                                            status.markdown(f"<div style='margin-left: 35px; color: #2e7d32; font-family: monospace; font-size: 0.85em;'>{log_str}</div>", unsafe_allow_html=True)
+                                            status.markdown(
+                                                f"<div style='margin-left: 35px; color: #2e7d32; font-family: monospace; font-size: 0.85em;'>{log_str}</div>",
+                                                unsafe_allow_html=True,
+                                            )
 
                                         # C: Color-code Errors/Warnings (Red)
-                                        elif "Error" in log_str or "WARNING" in log_str or "401" in log_str:
-                                            status.markdown(f"<div style='margin-left: 35px; color: #d32f2f; font-family: monospace; font-size: 0.85em;'>🚨 {log_str}</div>", unsafe_allow_html=True)
+                                        elif (
+                                            "Error" in log_str
+                                            or "WARNING" in log_str
+                                            or "401" in log_str
+                                        ):
+                                            status.markdown(
+                                                f"<div style='margin-left: 35px; color: #d32f2f; font-family: monospace; font-size: 0.85em;'>🚨 {log_str}</div>",
+                                                unsafe_allow_html=True,
+                                            )
 
                                         # D: Standard Muted System Logs (Gray)
                                         else:
-                                            status.markdown(f"<div style='margin-left: 35px; color: #888888; font-family: monospace; font-size: 0.8em;'>📝 {log_str}</div>", unsafe_allow_html=True)
+                                            status.markdown(
+                                                f"<div style='margin-left: 35px; color: #888888; font-family: monospace; font-size: 0.8em;'>📝 {log_str}</div>",
+                                                unsafe_allow_html=True,
+                                            )
 
                                 # 2. Handle Intermediate LangGraph Steps
                                 elif event_type == "status":
@@ -409,12 +427,18 @@ if prompt := st.chat_input("How can I help you today?"):
 
                                     if show_dev_trace:
                                         # Highlight LangGraph Nodes in Blue to stand out from system logs
-                                        status.markdown(f"<div style='margin-left: 15px; color: #1976d2; font-weight: 600;'>🔀 [Node: {step}] {content}</div>", unsafe_allow_html=True)
+                                        status.markdown(
+                                            f"<div style='margin-left: 15px; color: #1976d2; font-weight: 600;'>🔀 [Node: {step}] {content}</div>",
+                                            unsafe_allow_html=True,
+                                        )
                                     else:
                                         # Standard UI for normal users
-                                        if step == "INTENT": status.write(f"🎯 **Routing:** {content}")
-                                        elif step == "COMPLIANCE": status.write(f"⚖️ **Guardrails:** {content}")
-                                        else: status.write(f"⚙️ {content}")
+                                        if step == "INTENT":
+                                            status.write(f"🎯 **Routing:** {content}")
+                                        elif step == "COMPLIANCE":
+                                            status.write(f"⚖️ **Guardrails:** {content}")
+                                        else:
+                                            status.write(f"⚙️ {content}")
 
                                 # 3. Handle Final Output
                                 elif event_type == "response":
@@ -422,7 +446,10 @@ if prompt := st.chat_input("How can I help you today?"):
                                     final_metadata = event_data.get("metadata", {})
 
                                     new_id = event_data.get("conversation_id")
-                                    if new_id and new_id != st.session_state.conversation_id:
+                                    if (
+                                        new_id
+                                        and new_id != st.session_state.conversation_id
+                                    ):
                                         st.session_state.conversation_id = new_id
 
                             except json.JSONDecodeError:
@@ -431,24 +458,47 @@ if prompt := st.chat_input("How can I help you today?"):
                 # --- FINAL STATE RENDERING ---
                 if show_dev_trace:
                     status.write("`[FastAPI]` 📤 SSE Stream closed gracefully")
-                    status.update(label="✅ **Message Lifecycle Complete**", state="complete", expanded=False)
+                    status.update(
+                        label="✅ **Message Lifecycle Complete**",
+                        state="complete",
+                        expanded=False,
+                    )
 
-                    with st.expander("📊 LangGraph Telemetry & Metadata", expanded=True):
+                    with st.expander(
+                        "📊 LangGraph Telemetry & Metadata", expanded=True
+                    ):
                         st.markdown("**Routing & Confidence**")
-                        confidence = final_metadata.get('intent_confidence', 0.0)
-                        st.progress(float(confidence), text=f"Intent Confidence: {confidence * 100:.1f}%")
+                        confidence = final_metadata.get("intent_confidence", 0.0)
+                        st.progress(
+                            float(confidence),
+                            text=f"Intent Confidence: {confidence * 100:.1f}%",
+                        )
 
                         c1, c2 = st.columns(2)
-                        c1.metric("Compliance Passed", "✅ Yes" if final_metadata.get("is_compliant", True) else "❌ No")
-                        c2.metric("Escalation Triggered", "✅ Yes" if final_metadata.get("escalation_id") else "❌ No")
+                        c1.metric(
+                            "Compliance Passed",
+                            "✅ Yes"
+                            if final_metadata.get("is_compliant", True)
+                            else "❌ No",
+                        )
+                        c2.metric(
+                            "Escalation Triggered",
+                            "✅ Yes"
+                            if final_metadata.get("escalation_id")
+                            else "❌ No",
+                        )
 
                         st.markdown("**Raw Agent Metadata**")
                         st.json(final_metadata)
                 else:
-                    status.update(label="✅ **Response Ready**", state="complete", expanded=False)
+                    status.update(
+                        label="✅ **Response Ready**", state="complete", expanded=False
+                    )
 
                 st.markdown(bot_reply)
-                st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": bot_reply}
+                )
 
             elif response.status_code == 401:
                 st.error("Session Expired. Please logout and login again.")

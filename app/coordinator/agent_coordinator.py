@@ -246,11 +246,15 @@ class AgentCoordinator:
             context = {}
 
         # 1. OPEN CHECKPOINTER FIRST
-        async with AsyncPostgresSaver.from_conn_string(self._checkpointer_url) as checkpointer:
+        async with AsyncPostgresSaver.from_conn_string(
+            self._checkpointer_url
+        ) as checkpointer:
             self.logger.info("✅ Checkpointer connection opened.")
 
             if not self._checkpointer_setup_done:
-                self.logger.info("⚙️ Running Checkpointer DDL Setup (First time only)...")
+                self.logger.info(
+                    "⚙️ Running Checkpointer DDL Setup (First time only)..."
+                )
                 try:
                     await asyncio.wait_for(checkpointer.setup(), timeout=30.0)
                     self._checkpointer_setup_done = True
@@ -312,11 +316,29 @@ class AgentCoordinator:
 
                     # Yield UI Status Updates
                     if node_name == "classify":
-                        yield {"type": "status", "step": "intent", "content": f"Identified intent: {state_update.get('intent', 'unknown')}"}
-                    elif node_name in ["account", "general", "product", "human", "human_agent"]:
-                        yield {"type": "status", "step": "processing", "content": f"{node_name.replace('_', ' ').title()} is processing..."}
+                        yield {
+                            "type": "status",
+                            "step": "intent",
+                            "content": f"Identified intent: {state_update.get('intent', 'unknown')}",
+                        }
+                    elif node_name in [
+                        "account",
+                        "general",
+                        "product",
+                        "human",
+                        "human_agent",
+                    ]:
+                        yield {
+                            "type": "status",
+                            "step": "processing",
+                            "content": f"{node_name.replace('_', ' ').title()} is processing...",
+                        }
                     elif node_name == "compliance":
-                        yield {"type": "status", "step": "compliance", "content": "Verifying FCA compliance..."}
+                        yield {
+                            "type": "status",
+                            "step": "compliance",
+                            "content": "Verifying FCA compliance...",
+                        }
 
                     # --- DATABASE SAVING LOGIC ---
 
@@ -337,7 +359,7 @@ class AgentCoordinator:
                             content=final_data.get("message", ""),
                             agent_name=final_data.get("agent", "system"),
                             intent=final_data.get("intent", "unknown"),
-                            confidence_score=conf_val
+                            confidence_score=conf_val,
                         )
                         await session.commit()
 
@@ -345,7 +367,7 @@ class AgentCoordinator:
                             "type": "response",
                             "content": final_data.get("message"),
                             "metadata": final_data.get("metadata", {}),
-                            "conversation_id": conversation_id
+                            "conversation_id": conversation_id,
                         }
 
                     # B. Catch Human Agent Interruptions
@@ -353,15 +375,23 @@ class AgentCoordinator:
                     if isinstance(agent_meta, tuple):
                         agent_meta = agent_meta[0]
 
-                    is_escalated = node_name in ["human", "human_agent"] or agent_meta.get("escalated")
+                    is_escalated = node_name in [
+                        "human",
+                        "human_agent",
+                    ] or agent_meta.get("escalated")
 
                     if is_escalated and "final_response" not in state_update:
-                        human_msg = state_update.get("agent_response", "Your case has been escalated to a human agent.")
+                        human_msg = state_update.get(
+                            "agent_response",
+                            "Your case has been escalated to a human agent.",
+                        )
 
                         # Only save ONCE to prevent PostgreSQL Integrity Rollbacks
                         if not has_saved_human_msg:
                             conf = state_update.get("confidence")
-                            conf_val = int(float(conf) * 100) if conf is not None else 100
+                            conf_val = (
+                                int(float(conf) * 100) if conf is not None else 100
+                            )
 
                             try:
                                 # 🛡️ CRITICAL FIX: Open a completely isolated DB session.
@@ -375,26 +405,32 @@ class AgentCoordinator:
                                         content=human_msg,
                                         agent_name="human",
                                         intent="complaint",
-                                        confidence_score=conf_val
+                                        confidence_score=conf_val,
                                     )
                                     await isolated_session.commit()
 
                                 has_saved_human_msg = True
-                                self.logger.info("✅ Escalation successfully and permanently saved to DB!")
+                                self.logger.info(
+                                    "✅ Escalation successfully and permanently saved to DB!"
+                                )
                             except Exception as db_err:
-                                self.logger.error(f"❌ DB Save Failed for Escalation: {db_err}")
+                                self.logger.error(
+                                    f"❌ DB Save Failed for Escalation: {db_err}"
+                                )
 
                         # Yield to Streamlit UI
                         yield {
                             "type": "response",
                             "content": human_msg,
                             "metadata": {
-                                "intent_confidence": state_update.get("confidence", 1.0),
+                                "intent_confidence": state_update.get(
+                                    "confidence", 1.0
+                                ),
                                 "is_compliant": True,
                                 "escalation_id": agent_meta.get("escalation_id"),
-                                "agent_metadata": agent_meta
+                                "agent_metadata": agent_meta,
                             },
-                            "conversation_id": conversation_id
+                            "conversation_id": conversation_id,
                         }
 
     # ============================ HUMAN IN THE LOOP ============================
@@ -622,7 +658,9 @@ class AgentCoordinator:
                     else str(c.status),
                     "created_at": c.created_at.isoformat(),
                     # 🛠️ FIX: Add this line so Streamlit can sort by newest!
-                    "last_updated": c.updated_at.isoformat() if getattr(c, "updated_at", None) else c.created_at.isoformat(),
+                    "last_updated": c.updated_at.isoformat()
+                    if getattr(c, "updated_at", None)
+                    else c.created_at.isoformat(),
                     "message_count": getattr(c, "message_count", 0),
                 }
                 for c in conversations
