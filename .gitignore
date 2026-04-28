@@ -151,3 +151,5 @@ app/verify_conversation_api.py
 app/verify_full_workflow.py
 app/verify_hitl.py
 app/verify_memory.py
+
+fca_con_up.txt
