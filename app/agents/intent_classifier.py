@@ -161,7 +161,7 @@ class IntentClassifierAgent(BaseAgent):
         ]
 
     def _limit_history_context(
-        self, context: Optional[Dict[str, Any]], max_turns: int = 2
+        self, context: Optional[Dict[str, Any]], max_turns: int = 5
     ) -> List[Dict[str, str]]:
         if context and "conversation_history" in context:
             history = context["conversation_history"]
@@ -336,6 +336,7 @@ CRITICAL ROUTING RULES:
 3. **knowledge_inquiry**: Select this for ANY question about how the bank works, rules, fees, penalties, or "Can I..." questions, EVEN IF they mention a specific product.
    - "What is the penalty for closing a Fixed Rate Bond early?" -> knowledge_inquiry (Because it requires reading the PDF terms and conditions).
    - "Can I overpay my mortgage?" -> knowledge_inquiry.
+   - If a user asks for opinions on competitors or compares our bank to others -> knowledge_inquiry.
 """
 
     def get_supported_intents(self) -> List[str]:

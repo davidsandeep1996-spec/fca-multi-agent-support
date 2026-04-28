@@ -32,8 +32,8 @@ from app.api.routes.messages import router as messages_router
 from app.routers.admin import router as admin_router
 
 from app.api.routes.auth import router as auth_router
-
-
+import asyncio
+from contextvars import ContextVar
 # Import routers
 from app.routers import health
 
@@ -43,6 +43,25 @@ logger = logging.getLogger(__name__)
 
 
 coordinator = AgentCoordinator()
+
+# 1. Context Variable to hold the queue for the active web request
+stream_queue_var: ContextVar[asyncio.Queue] = ContextVar("stream_queue_var", default=None)
+
+# 2. Custom handler to intercept logs and push them to the stream
+class SSELogHandler(logging.Handler):
+    def emit(self, record):
+        q = stream_queue_var.get()
+        if q is not None:
+            # Format: [MODULE_NAME] The actual log message
+            msg = f"[{record.name.split('.')[-1].upper()}] {record.getMessage()}"
+            try:
+                loop = asyncio.get_running_loop()
+                loop.call_soon_threadsafe(q.put_nowait, {"type": "log", "content": msg})
+            except RuntimeError:
+                pass
+
+# 3. Attach interceptor to the global root logger
+logging.getLogger().addHandler(SSELogHandler())
 
 
 @asynccontextmanager
@@ -207,28 +226,71 @@ def create_application() -> FastAPI:
             "docs": "/docs" if settings.debug else "disabled",
         }
 
-    @app.get("/chat/stream", tags=["Chat"])
-    async def chat_stream(message: str, customer_id: int, conversation_id: int):
-        """
-        Stream chat response using Server-Sent Events (SSE).
-        """
+    @app.get("/chat/stream")
+    async def chat_stream(message: str, customer_id: int, conversation_id: int = 0):
 
         async def event_generator():
+            # Create the unified queue and attach it to the context variable
+            q = asyncio.Queue()
+            token = stream_queue_var.set(q)
+
+            # Background Task: Run LangGraph so it doesn't block the stream
+            async def run_graph():
+                try:
+                    async for event in coordinator.stream_message(message, customer_id, conversation_id):
+                        # Wrap LangGraph tuples into dictionaries if necessary, or push directly
+                        if isinstance(event, tuple):
+                            node_name, state = event
+
+                            # Stream the node status to the UI
+                            await q.put({"type": "status", "step": node_name, "content": f"Processing in {node_name}..."})
+
+                            # 1. Catch Standard Agent Responses (from Node: End)
+                            if "final_response" in state:
+                                final_resp = state["final_response"]
+                                await q.put({
+                                    "type": "response",
+                                    "content": final_resp.get("message", ""),
+                                    "metadata": final_resp.get("metadata", {}),
+                                    "conversation_id": conversation_id
+                                })
+
+                            # 2. Catch Human Agent Interruptions (Skips Node: End)
+                            elif node_name.lower() in ["human_agent", "human"] or state.get("agent_metadata", {}).get("escalated"):
+                                if "agent_response" in state:
+                                    await q.put({
+                                        "type": "response",
+                                        "content": state.get("agent_response"),
+                                        "metadata": {
+                                            "intent_confidence": state.get("confidence", 1.0),
+                                            "is_compliant": True,  # Escalations are always compliant
+                                            "escalation_id": state.get("agent_metadata", {}).get("escalation_id"),
+                                            "agent_metadata": state.get("agent_metadata", {})
+                                        },
+                                        "conversation_id": conversation_id
+                                    })
+                        else:
+                            await q.put(event)
+                except Exception as e:
+                    await q.put({"type": "log", "content": f"[ERROR] {str(e)}"})
+                finally:
+                    await q.put({"type": "done"})
+
+            # Start LangGraph in the background
+            task = asyncio.create_task(run_graph())
+
             try:
-                # Iterate over the coordinator's generator
-                async for event in coordinator.stream_message(
-                    message, customer_id, conversation_id
-                ):
-                    # Format as SSE data
-                    yield f"data: {json.dumps(event)}\n\n"
-
-                # Signal end of stream
-                yield "event: done\ndata: [DONE]\n\n"
-
-            except Exception as e:
-                logger.error(f"Stream error: {e}", exc_info=True)
-                error_data = json.dumps({"error": str(e)})
-                yield f"event: error\ndata: {error_data}\n\n"
+                # Foreground Task: Yield whatever comes into the queue
+                while True:
+                    item = await q.get()
+                    if item.get("type") == "done":
+                        yield "data: [DONE]\n\n"
+                        break
+                    yield f"data: {json.dumps(item)}\n\n"
+            finally:
+                # Clean up the context and task when the stream closes
+                stream_queue_var.reset(token)
+                task.cancel()
 
         return StreamingResponse(event_generator(), media_type="text/event-stream")
 

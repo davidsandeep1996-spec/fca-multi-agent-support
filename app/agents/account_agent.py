@@ -79,6 +79,22 @@ class AccountAgent(BaseAgent):
                 return date_val
         return date_val.strftime("%d %b %Y")
 
+    def _format_history(self, context: Optional[Dict[str, Any]], max_turns: int = 5) -> str:
+        """Extracts and formats recent conversation history for the LLM prompt."""
+        if not context or "conversation_history" not in context:
+            return ""
+        history = context["conversation_history"][-max_turns:]
+        if not history:
+            return ""
+
+        formatted = []
+        for msg in history:
+            role = msg.get("role", "user").upper()
+            content = msg.get("content", "")
+            formatted.append(f"{role}: {content}")
+
+        return "PREVIOUS CONVERSATION HISTORY:\n" + "\n".join(formatted) + "\n\n"
+
     @observe(name="AccountAgent")
     async def process(
         self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None
@@ -94,7 +110,7 @@ class AccountAgent(BaseAgent):
                 raise ValueError("Unauthorized: customer_id is required.")
 
             # 1. AI Intent Extraction
-            query_type = await self._determine_query_type(message)
+            query_type = await self._determine_query_type(message, context)
 
             # 2. Fetch Raw Database Data
             async with (
@@ -108,7 +124,7 @@ class AccountAgent(BaseAgent):
 
             # 3. AI Conversational Generation
             conversational_response = await self._generate_conversational_response(
-                message, raw_data
+                message, raw_data, context
             )
 
             response = self.create_response(
@@ -131,9 +147,11 @@ class AccountAgent(BaseAgent):
                 confidence=0.0,
             )
 
-    async def _determine_query_type(self, message: str) -> str:
+    async def _determine_query_type(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
         """Uses LLM structured output with Zero-Shot formatting to flawlessly identify user intent."""
+        history_str = self._format_history(context)
         prompt = f"""
+        {history_str}
         Analyze the following user banking query: "{message}"
 
         Determine if they are asking for:
@@ -169,15 +187,21 @@ class AccountAgent(BaseAgent):
             return "general"
 
     async def _generate_conversational_response(
-        self, user_message: str, raw_data: Dict[str, Any]
+        self, user_message: str, raw_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None
     ) -> str:
         """Feeds raw DB JSON to the LLM to generate a natural, helpful response."""
         if raw_data.get("error"):
             return "I'm sorry, I couldn't locate your active account details at this moment."
 
+        history_str = self._format_history(context)
+
+        # 🛠️ FIX: Give the bank a name (e.g., Nexus Bank) and forbid placeholders!
         prompt = f"""
-        You are a highly professional banking AI assistant.
-        The user asked: "{user_message}"
+        You are a highly professional banking AI assistant for One Bank.
+
+        {history_str}
+
+        CURRENT USER MESSAGE: "{user_message}"
 
         Here is the securely retrieved raw data from their bank account:
         {json.dumps(raw_data.get("data", {}), indent=2)}
@@ -185,6 +209,7 @@ class AccountAgent(BaseAgent):
         Task:
         Formulate a polite, clear, and professional response to the user answering their question using ONLY this data.
         Ensure numbers look like currency where appropriate. Do not hallucinate any data not present in the JSON.
+        Sign off your message natively as One Bank. NEVER use brackets or placeholders like [Your Bank's Name].
         """
         try:
             response = await self.client.chat.completions.create(
@@ -203,31 +228,34 @@ class AccountAgent(BaseAgent):
         """Strictly fetches data using specific repository lookups."""
 
         # FIX: Use the repository to search by the string 'CUST-000001'
-        customer = await cust_svc.repo.get_by_customer_id(customer_id)
+        clean_id = str(customer_id).replace("CUST-", "")
+        formatted_customer_id = f"CUST-{clean_id.zfill(6)}"
+        customer = await cust_svc.repo.get_by_customer_id(formatted_customer_id)
         if not customer:
             return {"error": "customer_not_found"}
 
-        accounts = await acct_svc.get_accounts_by_customer(customer_id)
+        accounts = await acct_svc.get_accounts_by_customer(formatted_customer_id)
         if not accounts:
             return {"error": "no_accounts_found"}
 
         acct = accounts[0]
 
-        if query_type == "balance":
-            return {
-                "data": {
-                    "account_number": getattr(acct, "account_number", "N/A"),
-                    "account_type": self._friendly_account_type(
-                        getattr(acct, "type", None)
-                    ),
-                    "balance": self._format_currency(
-                        float(getattr(acct, "balance", 0.0))
-                    ),
+        if query_type == "balance" or query_type == "details":
+            # 🛠️ FIX: Loop through ALL accounts and pass them to the AI
+            accounts_data = []
+            for acc in accounts:
+                accounts_data.append({
+                    "account_number": getattr(acc, "account_number", "N/A"),
+                    "account_type": self._friendly_account_type(getattr(acc, "type", None)),
+                    "balance": self._format_currency(float(getattr(acc, "balance", 0.0))),
                     "status": "Active",
-                },
-                "data_points": ["balance"],
-            }
+                    "opened_on": self._friendly_date(getattr(acc, "created_at", None))
+                })
 
+            return {
+                "data": {"portfolio": accounts_data},
+                "data_points": [query_type],
+            }
         elif query_type == "transactions":
             # FIX: We need the internal integer 'id' for transactions
             account_id = getattr(acct, "id", None)
@@ -249,19 +277,6 @@ class AccountAgent(BaseAgent):
             return {
                 "data": {"recent_transactions": txns},
                 "data_points": ["transactions"],
-            }
-
-        elif query_type == "details":
-            return {
-                "data": {
-                    "account_number": getattr(acct, "account_number", "N/A"),
-                    "account_type": self._friendly_account_type(
-                        getattr(acct, "type", None)
-                    ),
-                    "opened_on": self._friendly_date(getattr(acct, "created_at", None)),
-                    "status": "Active",
-                },
-                "data_points": ["details"],
             }
 
         elif query_type == "statement":

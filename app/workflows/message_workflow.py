@@ -553,6 +553,7 @@ class MessageWorkflow:
         customer_id: int,
         conversation_id: int = 0,
         context: Optional[Dict[str, Any]] = None,
+        history: List[Dict[str, str]] = None,
     ):
         """
         Stream workflow execution (Yields partial updates node-by-node).
@@ -562,6 +563,7 @@ class MessageWorkflow:
             "customer_id": customer_id,
             "conversation_id": conversation_id,
             "context": context or {},
+            "history": history or [],
         }
 
         # [CHANGED] Add the mandatory config object so AsyncPostgresSaver knows where to stream

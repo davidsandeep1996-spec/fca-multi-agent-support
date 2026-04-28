@@ -149,6 +149,7 @@ def setup_logging(
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("langfuse").setLevel(logging.WARNING)
 
     # Log initialization
     logger = logging.getLogger(__name__)

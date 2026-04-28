@@ -195,7 +195,7 @@ async def process_message(
 )
 async def get_conversation_history(
     conversation_id: int,
-    limit: int = 50,
+    limit: int = 1000,
 ) -> ConversationHistory:
     """
     Get conversation history (DB Backed).

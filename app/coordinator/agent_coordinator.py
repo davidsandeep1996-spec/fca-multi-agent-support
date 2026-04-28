@@ -137,15 +137,17 @@ class AgentCoordinator:
                     db_history = await msg_svc.get_conversation_messages(
                         conversation_id, page_size=15
                     )
-                    history = [
-                        {
-                            "role": "user"
-                            if getattr(m, "role", "user") in ["customer", "user"]
-                            else "assistant",
-                            "content": getattr(m, "content", ""),
-                        }
-                        for m in db_history
-                    ]
+                    if db_history:
+                        history = [
+                            {
+                                "role": "user"
+                                if getattr(m, "role", "user") in ["customer", "user"]
+                                else "assistant",
+                                "content": getattr(m, "content", ""),
+                            }
+                            for m in db_history
+                        ]
+                    await session.commit()
 
                     self.logger.info("⏳ Initializing MessageWorkflow...")
                     workflow = MessageWorkflow(
@@ -244,34 +246,37 @@ class AgentCoordinator:
             context = {}
 
         # 1. OPEN CHECKPOINTER FIRST
-        async with AsyncPostgresSaver.from_conn_string(
-            self._checkpointer_url
-        ) as checkpointer:
+        async with AsyncPostgresSaver.from_conn_string(self._checkpointer_url) as checkpointer:
             self.logger.info("✅ Checkpointer connection opened.")
 
-            # RUN SETUP ONLY ONCE
             if not self._checkpointer_setup_done:
-                self.logger.info(
-                    "⚙️ Running Checkpointer DDL Setup (First time only)..."
-                )
+                self.logger.info("⚙️ Running Checkpointer DDL Setup (First time only)...")
                 try:
-                    # 🚨 CIRCUIT BREAKER: Force a 5-second timeout on the DB lock
                     await asyncio.wait_for(checkpointer.setup(), timeout=30.0)
                     self._checkpointer_setup_done = True
-                    self.logger.info("✅ Checkpointer DDL Setup complete.")
                 except asyncio.TimeoutError:
-                    self.logger.error(
-                        "🚨 DATABASE DEADLOCK DETECTED! Another process is holding a lock."
-                    )
-                    raise Exception(
-                        "Database Deadlock during Checkpointer Setup. Please restart your DB container."
-                    )
+                    self.logger.error("🚨 DATABASE DEADLOCK DETECTED!")
+                    raise Exception("Database Deadlock during Checkpointer Setup.")
 
-            # 2. OPEN SQLALCHEMY TRANSACTION
+            history = []
+
+            # 2. OPEN A SINGLE UNIFIED SQLALCHEMY TRANSACTION
             async with AsyncSessionLocal() as session:
                 conv_svc = ConversationService(db=session)
                 msg_svc = MessageService(db=session)
 
+                # Create conversation if it doesn't exist
+                existing_conv = await conv_svc.get_conversation(conversation_id)
+                if not existing_conv:
+                    new_conv = await conv_svc.start_conversation(
+                        customer_id=customer_id,
+                        title="New Conversation",
+                        channel="web",
+                    )
+                    await session.flush()
+                    conversation_id = new_conv.id
+
+                # Save Customer Message
                 await msg_svc.add_message(
                     conversation_id=conversation_id,
                     role=MessageRole.CUSTOMER,
@@ -279,6 +284,7 @@ class AgentCoordinator:
                 )
                 await session.commit()
 
+                # Initialize Workflow
                 workflow = MessageWorkflow(
                     account_service=AccountService(db=session),
                     customer_service=CustomerService(db=session),
@@ -290,51 +296,108 @@ class AgentCoordinator:
                     checkpointer=checkpointer,
                 )
 
-                async for node_name, state_update in workflow.process_message_stream(
-                    sanitized_message, customer_id, conversation_id, context
-                ):
-                    if node_name == "classify":
-                        yield {
-                            "type": "status",
-                            "step": "intent",
-                            "content": f"Identified intent: {state_update.get('intent')}",
-                        }
-                    elif node_name in ["account", "general", "product", "human"]:
-                        yield {
-                            "type": "status",
-                            "step": "processing",
-                            "content": f"{node_name.capitalize()} Agent is processing...",
-                        }
-                    elif node_name == "compliance":
-                        yield {
-                            "type": "status",
-                            "step": "compliance",
-                            "content": "Verifying FCA compliance...",
-                        }
-                    elif node_name == "end":
-                        final_data = state_update.get("final_response", {})
+                # 🔒 LOCK TO PREVENT DB DOUBLE-SAVES
+                has_saved_human_msg = False
 
-                        # Save final output in a new transaction
-                        async with AsyncSessionLocal() as save_session:
-                            final_msg_svc = MessageService(db=save_session)
-                            await final_msg_svc.add_message(
-                                conversation_id=conversation_id,
-                                role=MessageRole.AGENT,
-                                content=final_data.get("message"),
-                                agent_name=final_data.get("agent"),
-                                intent=final_data.get("intent"),
-                            )
-                            await save_session.commit()
+                # Execute Graph
+                async for node_name, state_update in workflow.process_message_stream(
+                    sanitized_message, customer_id, conversation_id, context, history
+                ):
+                    # 🛡️ BULLETPROOF TUPLE UNWRAPPER
+                    if isinstance(state_update, tuple):
+                        state_update = state_update[0] if state_update else {}
+
+                    if not isinstance(state_update, dict):
+                        continue
+
+                    # Yield UI Status Updates
+                    if node_name == "classify":
+                        yield {"type": "status", "step": "intent", "content": f"Identified intent: {state_update.get('intent', 'unknown')}"}
+                    elif node_name in ["account", "general", "product", "human", "human_agent"]:
+                        yield {"type": "status", "step": "processing", "content": f"{node_name.replace('_', ' ').title()} is processing..."}
+                    elif node_name == "compliance":
+                        yield {"type": "status", "step": "compliance", "content": "Verifying FCA compliance..."}
+
+                    # --- DATABASE SAVING LOGIC ---
+
+                    # A. Catch Normal Flow (Node: End)
+                    if "final_response" in state_update:
+                        final_data = state_update["final_response"]
+                        if isinstance(final_data, tuple):
+                            final_data = final_data[0]
+
+                        # Safely extract confidence
+                        conf = final_data.get("confidence")
+                        conf_val = int(float(conf) * 100) if conf is not None else 0
+
+                        # 💾 Save using the existing session
+                        await msg_svc.add_message(
+                            conversation_id=conversation_id,
+                            role=MessageRole.AGENT,
+                            content=final_data.get("message", ""),
+                            agent_name=final_data.get("agent", "system"),
+                            intent=final_data.get("intent", "unknown"),
+                            confidence_score=conf_val
+                        )
+                        await session.commit()
 
                         yield {
                             "type": "response",
                             "content": final_data.get("message"),
-                            "metadata": final_data.get("metadata"),
-                            "conversation_id": conversation_id,
+                            "metadata": final_data.get("metadata", {}),
+                            "conversation_id": conversation_id
                         }
 
-    # ========================================================================
-    # HUMAN IN THE LOOP
+                    # B. Catch Human Agent Interruptions
+                    agent_meta = state_update.get("agent_metadata", {})
+                    if isinstance(agent_meta, tuple):
+                        agent_meta = agent_meta[0]
+
+                    is_escalated = node_name in ["human", "human_agent"] or agent_meta.get("escalated")
+
+                    if is_escalated and "final_response" not in state_update:
+                        human_msg = state_update.get("agent_response", "Your case has been escalated to a human agent.")
+
+                        # Only save ONCE to prevent PostgreSQL Integrity Rollbacks
+                        if not has_saved_human_msg:
+                            conf = state_update.get("confidence")
+                            conf_val = int(float(conf) * 100) if conf is not None else 100
+
+                            try:
+                                # 🛡️ CRITICAL FIX: Open a completely isolated DB session.
+                                # LangGraph's interrupt pauses the graph and can corrupt or
+                                # lock the shared primary transaction.
+                                async with AsyncSessionLocal() as isolated_session:
+                                    safe_msg_svc = MessageService(db=isolated_session)
+                                    await safe_msg_svc.add_message(
+                                        conversation_id=conversation_id,
+                                        role=MessageRole.AGENT,
+                                        content=human_msg,
+                                        agent_name="human",
+                                        intent="complaint",
+                                        confidence_score=conf_val
+                                    )
+                                    await isolated_session.commit()
+
+                                has_saved_human_msg = True
+                                self.logger.info("✅ Escalation successfully and permanently saved to DB!")
+                            except Exception as db_err:
+                                self.logger.error(f"❌ DB Save Failed for Escalation: {db_err}")
+
+                        # Yield to Streamlit UI
+                        yield {
+                            "type": "response",
+                            "content": human_msg,
+                            "metadata": {
+                                "intent_confidence": state_update.get("confidence", 1.0),
+                                "is_compliant": True,
+                                "escalation_id": agent_meta.get("escalation_id"),
+                                "agent_metadata": agent_meta
+                            },
+                            "conversation_id": conversation_id
+                        }
+
+    # ============================ HUMAN IN THE LOOP ============================
     # ========================================================================
 
     async def approve_intervention(
@@ -512,7 +575,7 @@ class AgentCoordinator:
             }
 
     async def get_db_conversation_history(
-        self, conversation_id: int, limit: int = 50
+        self, conversation_id: int, limit: int = 1000
     ) -> List[Dict[str, Any]]:
         """Fetch strict conversational payload for UI rendering."""
         async with AsyncSessionLocal() as session:
@@ -558,6 +621,8 @@ class AgentCoordinator:
                     if hasattr(c.status, "value")
                     else str(c.status),
                     "created_at": c.created_at.isoformat(),
+                    # 🛠️ FIX: Add this line so Streamlit can sort by newest!
+                    "last_updated": c.updated_at.isoformat() if getattr(c, "updated_at", None) else c.created_at.isoformat(),
                     "message_count": getattr(c, "message_count", 0),
                 }
                 for c in conversations

@@ -18,8 +18,10 @@ from passlib.context import CryptContext  # Requires passlib
 
 
 #  Import Presidio Engines
-from presidio_analyzer import AnalyzerEngine
+from presidio_analyzer import AnalyzerEngine, PatternRecognizer, Pattern
 from presidio_anonymizer import AnonymizerEngine
+
+from presidio_analyzer.nlp_engine import NlpEngineProvider
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -27,13 +29,33 @@ logger = logging.getLogger(__name__)
 
 class SecurityService:
     def __init__(self):
+        configuration = {
+            "nlp_engine_name": "spacy",
+            "models": [{"lang_code": "en", "model_name": "en_core_web_lg"}],
+        }
+
+        # 2. Create the provider and engine programmatically
+        provider = NlpEngineProvider(nlp_configuration=configuration)
+        nlp_engine = provider.create_engine()
+
         self.enabled = settings.security_enabled
         self.redact_pii = settings.pii_redaction_enabled
 
         # We wrap in try/except in case the Spacy model isn't downloaded locally
         try:
             if self.redact_pii:
-                self.analyzer = AnalyzerEngine()
+                self.analyzer = AnalyzerEngine(nlp_engine=nlp_engine,supported_languages=["en"])
+                        # Regex matches: 2 Letters, 6 Numbers, 1 Letter (with or without spaces)
+                nino_regex = r"(?i)\b[A-Z]{2}\s?[0-9]{2}\s?[0-9]{2}\s?[0-9]{2}\s?[A-D]\b"
+                nino_pattern = Pattern(name="uk_nino_pattern", regex=nino_regex, score=0.85)
+
+                nino_recognizer = PatternRecognizer(
+                    supported_entity="UK_NINO",
+                    patterns=[nino_pattern]
+                )
+
+                # Register the custom UK rule into the engine
+                self.analyzer.registry.add_recognizer(nino_recognizer)
                 self.anonymizer = AnonymizerEngine()
                 logger.info("✅ Presidio PII Engine Initialized")
             else:

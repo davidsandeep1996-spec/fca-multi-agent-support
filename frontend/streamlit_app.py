@@ -255,8 +255,8 @@ if not st.session_state.token:
 
         with st.form("login_form"):
             # Default test credentials pre-filled for convenience
-            uid = st.text_input("Email / User ID", value="wthomas@example.org")
-            pwd = st.text_input("Password", type="password", value="password123")
+            uid = st.text_input("Email / User ID")
+            pwd = st.text_input("Password", type="password")
 
             submitted = st.form_submit_button("Secure Login 🔒")
 
@@ -266,10 +266,8 @@ if not st.session_state.token:
                 else:
                     login(uid, pwd)
 
-        st.info("💡 Default Test Creds: `james.bond@mi6.gov.uk` / `password123`")
-
-    # Stop execution here if not logged in
-    st.stop()
+            # Stop execution here if not logged in
+            st.stop()
 
 # ============================================================
 # VIEW 2: MAIN APP (Only visible if logged in)
@@ -306,6 +304,14 @@ with st.sidebar:
     if st.button("🚪 Logout", use_container_width=True):
         logout()
 
+    st.markdown("---")
+    st.markdown("### 🛠️ Developer Settings")
+    show_dev_trace = st.toggle(
+        "Enable API Lifecycle Trace",
+        value=True,
+        help="Show the detailed message path from FastAPI to LangGraph and back."
+    )
+
 # --- CHAT INTERFACE ---
 st.title(f"{PAGE_ICON} AI Support Agent")
 st.caption(
@@ -326,45 +332,129 @@ if prompt := st.chat_input("How can I help you today?"):
 
     # Call Backend
     with st.chat_message("assistant"):
-        message_placeholder = st.empty()
-        message_placeholder.markdown("⏳ *Thinking...*")
+
+        # --- DYNAMIC UI SWITCH ---
+        if show_dev_trace:
+            status = st.status("📡 **Tracing API Lifecycle...**", expanded=True)
+            status.write("`[FastAPI]` 📥 Request received at `/chat/stream`")
+        else:
+            status = st.status("🧠 **Analyzing request...**", expanded=True)
 
         try:
             headers = {
                 "Authorization": f"Bearer {st.session_state.token}",
-                "Content-Type": "application/json",
-            }
-            payload = {
-                "message": prompt,
-                "customer_id": st.session_state.customer_id,
-                "conversation_id": st.session_state.conversation_id,
+                "Accept": "text/event-stream",
             }
 
-            response = requests.post(
-                f"{API_BASE_URL}/messages/process",
+            stream_url = API_BASE_URL.replace("/api/v1", "") + "/chat/stream"
+
+            response = requests.get(
+                stream_url,
                 headers=headers,
-                json=payload,
+                params={
+                    "message": prompt,
+                    "customer_id": st.session_state.customer_id,
+                    "conversation_id": st.session_state.conversation_id,
+                },
+                stream=True,
                 timeout=120,
             )
 
+            bot_reply = ""
+            final_metadata = {}
+
             if response.status_code == 200:
-                data = response.json()
-                bot_reply = data.get("response", "Error: No response")
+                for line in response.iter_lines():
+                    if line:
+                        decoded_line = line.decode('utf-8')
+                        if decoded_line.startswith("data: "):
+                            data_str = decoded_line[6:].strip()
+                            if data_str == "[DONE]":
+                                break
 
-                new_id = data.get("conversation_id")
-                if new_id and new_id != st.session_state.conversation_id:
-                    st.session_state.conversation_id = new_id
-                message_placeholder.markdown(bot_reply)
-                st.session_state.messages.append(
-                    {"role": "assistant", "content": bot_reply}
-                )
+                            try:
+                                event_data = json.loads(data_str)
+                                event_type = event_data.get("type")
 
-                st.session_state.debug_info = data
-                st.rerun()  # Update sidebar
+                                # 1. Handle Deep System Logs
+                                if event_type == "log":
+                                    if show_dev_trace:
+                                        log_str = event_data.get('content', '')
+
+                                        # A: Catch massive JSON traces (like Langfuse) & hide in an expander
+                                        if "Full details: {" in log_str:
+                                            summary, json_payload = log_str.split("Full details: ", 1)
+                                            with status.expander(f"🧩 {summary.strip()}", expanded=False):
+                                                try:
+                                                    st.json(json.loads(json_payload))
+                                                except:
+                                                    st.code(json_payload, language="json")
+
+                                        # B: Color-code Success logs (Green)
+                                        elif "✅" in log_str:
+                                            status.markdown(f"<div style='margin-left: 35px; color: #2e7d32; font-family: monospace; font-size: 0.85em;'>{log_str}</div>", unsafe_allow_html=True)
+
+                                        # C: Color-code Errors/Warnings (Red)
+                                        elif "Error" in log_str or "WARNING" in log_str or "401" in log_str:
+                                            status.markdown(f"<div style='margin-left: 35px; color: #d32f2f; font-family: monospace; font-size: 0.85em;'>🚨 {log_str}</div>", unsafe_allow_html=True)
+
+                                        # D: Standard Muted System Logs (Gray)
+                                        else:
+                                            status.markdown(f"<div style='margin-left: 35px; color: #888888; font-family: monospace; font-size: 0.8em;'>📝 {log_str}</div>", unsafe_allow_html=True)
+
+                                # 2. Handle Intermediate LangGraph Steps
+                                elif event_type == "status":
+                                    step = event_data.get("step", "processing").upper()
+                                    content = event_data.get("content", "")
+
+                                    if show_dev_trace:
+                                        # Highlight LangGraph Nodes in Blue to stand out from system logs
+                                        status.markdown(f"<div style='margin-left: 15px; color: #1976d2; font-weight: 600;'>🔀 [Node: {step}] {content}</div>", unsafe_allow_html=True)
+                                    else:
+                                        # Standard UI for normal users
+                                        if step == "INTENT": status.write(f"🎯 **Routing:** {content}")
+                                        elif step == "COMPLIANCE": status.write(f"⚖️ **Guardrails:** {content}")
+                                        else: status.write(f"⚙️ {content}")
+
+                                # 3. Handle Final Output
+                                elif event_type == "response":
+                                    bot_reply = event_data.get("content", "")
+                                    final_metadata = event_data.get("metadata", {})
+
+                                    new_id = event_data.get("conversation_id")
+                                    if new_id and new_id != st.session_state.conversation_id:
+                                        st.session_state.conversation_id = new_id
+
+                            except json.JSONDecodeError:
+                                continue
+
+                # --- FINAL STATE RENDERING ---
+                if show_dev_trace:
+                    status.write("`[FastAPI]` 📤 SSE Stream closed gracefully")
+                    status.update(label="✅ **Message Lifecycle Complete**", state="complete", expanded=False)
+
+                    with st.expander("📊 LangGraph Telemetry & Metadata", expanded=True):
+                        st.markdown("**Routing & Confidence**")
+                        confidence = final_metadata.get('intent_confidence', 0.0)
+                        st.progress(float(confidence), text=f"Intent Confidence: {confidence * 100:.1f}%")
+
+                        c1, c2 = st.columns(2)
+                        c1.metric("Compliance Passed", "✅ Yes" if final_metadata.get("is_compliant", True) else "❌ No")
+                        c2.metric("Escalation Triggered", "✅ Yes" if final_metadata.get("escalation_id") else "❌ No")
+
+                        st.markdown("**Raw Agent Metadata**")
+                        st.json(final_metadata)
+                else:
+                    status.update(label="✅ **Response Ready**", state="complete", expanded=False)
+
+                st.markdown(bot_reply)
+                st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+
             elif response.status_code == 401:
                 st.error("Session Expired. Please logout and login again.")
             else:
                 st.error(f"Error {response.status_code}: {response.text}")
 
         except Exception as e:
+            status.update(label="🚨 Connection Failed", state="error")
             st.error(f"Connection Error: {e}")
