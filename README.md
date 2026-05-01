@@ -735,20 +735,46 @@ State machine controlling:
 
 # 🧪 Testing & Verification
 
-Run full test suite:
+This project uses `pytest` for comprehensive unit and integration testing across the multi-agent architecture. Tests run against the real PostgreSQL database and Groq API to ensure production-level accuracy.
 
+### Run the Test Suite
+To execute the entire test suite with verbose output:
 ```bash
-python verify_full_workflow.py
-python verify_evaluation.py
-python verify_memory.py
+pytest tests/ -v
 ```
 
-Diagnostic scripts:
+### Agent & Service Unit Tests
 
-- `verify_full_workflow.py` → end-to-end LangGraph test  
-- `verify_rag.py` → semantic search evaluation  
-- `verify_evaluation.py` → adversarial prompt testing  
-- `verify_memory.py` → multi-turn context validation  
+Validates the isolated logic, database interactions, prompt generation, and expected outputs of each specialized component.
+
+ - `./tests/test_intent_classifier.py` — Validates few-shot intent routing across various scenarios (product acquisition, account data, complaints), tests context-aware memory overrides (e.g., forcing a general inquiry based on previous turns), and ensures graceful error fallbacks for invalid frontend data.
+
+ - `./tests/test_account_agent.py` — Tests database queries for balance extraction, transaction history formatting, statement generation, and account details.
+
+ - `./tests/test_general_agent.py` — Validates simple FAQ DB retrieval, pgvector RAG document search, Redis semantic caching, and safe refusal logic for unknown topics.
+
+ - `./tests/test_product_agent.py` — Uses an advanced hybrid asserter (LLM Judge + exact keywords) to validate structured product recommendations, enforces strict eligibility constraints (e.g., rejecting deposits below the minimum balance), and verifies accurate economic reasoning (e.g., tracker mortgage rate adjustments).
+
+ - `./tests/test_compliance_checker.py` — Checks fast heuristic short-circuits (e.g., blocking "risk-free"), LLM compliance evaluations, false-positive handling, and deterministic FCA disclaimer injection.
+
+ - `./tests/test_human_agent.py` — Validates emergency fast-path routing (fraud), priority assignment, missing input handling, and graceful degradation during simulated DB outages.
+
+ - `./tests/test_rag_search.py` — Validates the pgvector database and SentenceTransformer embeddings by running parameterized semantic searches against 40+ FAQ test cases.
+
+### Workflow & Orchestration Tests
+
+Verifies the LangGraph state machine, memory checkpointer, security firewalls, and multi-agent handoffs.
+
+ - `./tests/test_coordinator1.py` — Tests the AgentCoordinator's ability to process messages dynamically, maintain state, aggregate system statistics, and retrieve conversation history.
+
+ - `./tests/test_coordinator2.py` — Verifies real security guardrail blocking for prompt injections, admin Human-in-the-Loop (HITL) interventions, and escalation ticket resolution in the DB.
+
+ - `./tests/test_coordinator3.py` — Tests failure recovery, ensuring safe DB transaction rollbacks on crashes, and proper rejection of invalid admin interventions.
+
+ - `./tests/test_full_workflow1.py` — Tests end-to-end LangGraph execution for normal routing paths and verifies the native checkpointer pauses correctly for human escalations.
+
+ - `./tests/test_full_workflow2.py` — Validates edge-case workflow routing, specifically testing the system's firewall against financial traps and malicious jailbreak attempts.
+
 
 ---
 
